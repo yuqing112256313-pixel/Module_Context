@@ -47,3 +47,13 @@ Qt demo 构建后会把 `mc_task_flow_worker_host.exe`、`rabbitmq_bus.dll`、
 `master_module_config.json` 和 `local_workers/*/worker_module_config.json`。
 
 桌面端仍然使用当前 E2E 的数据面：TaskMessage 只携带 `image_id/token/bytes` 和 HTTP 参数；worker 仍然通过 HTTP 从主机内存仓库拉图。
+
+## SSH 截图验证
+
+在不能打开远程桌面的环境里，可以让程序自己渲染主窗口并保存 PNG：
+
+```powershell
+.\mc_task_flow_qt_master_demod.exe --screenshot H:\Codex\Screenshots\qt-master-demo.png
+```
+
+这个模式会使用 Qt offscreen 平台插件，不需要 Windows App / RDP 会话。

@@ -78,7 +78,9 @@ Write-Host ""
 
 $git = Test-Command "git.exe" @(
     "C:\Program Files\Git\cmd\git.exe",
-    "C:\Program Files\Git\bin\git.exe"
+    "C:\Program Files\Git\bin\git.exe",
+    "E:\Program Files\Git\cmd\git.exe",
+    "E:\Program Files\Git\bin\git.exe"
 )
 if ($git) { & $git --version }
 
@@ -89,6 +91,7 @@ if ($pwsh) { & $pwsh --version }
 
 $cmake = Test-Command "cmake.exe" @(
     "C:\Program Files\CMake\bin\cmake.exe",
+    "H:\Program Files\CMake\bin\cmake.exe",
     "C:\toolchains\portable\cmake-4.3.2-windows-x86_64\bin\cmake.exe"
 )
 if ($cmake) { & $cmake --version | Select-Object -First 1 }

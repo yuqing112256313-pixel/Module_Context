@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SSH_ALIAS="${SSH_ALIAS:-aliyun-win}"
+SSH_ALIAS="${SSH_ALIAS:-win-home}"
 REPO_URL="${REPO_URL:-https://github.com/yuqing112256313-pixel/Module_Context.git}"
-REMOTE_WORKDIR="${REMOTE_WORKDIR:-C:\\work\\Module_Context}"
+REMOTE_WORKDIR="${REMOTE_WORKDIR:-H:\\Codex\\Module_Context}"
 PRESET="${PRESET:-windows-vs2015-x64-debug}"
 BRANCH="${BRANCH:-$(git branch --show-current)}"
 
@@ -34,7 +34,12 @@ cat >"${remote_script}" <<PS1
 function Find-Git {
     \$cmd = Get-Command git.exe -ErrorAction SilentlyContinue
     if (\$cmd) { return \$cmd.Source }
-    foreach (\$path in @("C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe")) {
+    foreach (\$path in @(
+        "C:\\Program Files\\Git\\cmd\\git.exe",
+        "C:\\Program Files\\Git\\bin\\git.exe",
+        "E:\\Program Files\\Git\\cmd\\git.exe",
+        "E:\\Program Files\\Git\\bin\\git.exe"
+    )) {
         if (Test-Path \$path) { return \$path }
     }
     throw "git.exe was not found. Install Git for Windows first."

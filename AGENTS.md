@@ -1,15 +1,17 @@
 # Project Agents Guide
 
 This repository is maintained from macOS / Apple Silicon, but the target
-validation environment is a remote Windows Server 2022 x64 ECS host.
+validation environment is a remote Windows x64 build host.
 
 ## Operating Model
 
 - Local working tree: macOS, usually edited by Codex.
-- Remote Windows host: SSH alias `aliyun-win`.
-- Remote checkout path: `C:\work\Module_Context`.
+- Primary remote Windows host: SSH alias `win-home`.
+- Legacy cloud host, if needed: SSH alias `aliyun-win`.
+- Primary remote checkout path: `H:\Codex\Module_Context`.
+- Primary installer/cache path: `H:\Installers`.
 - GitHub repository: `https://github.com/yuqing112256313-pixel/Module_Context.git`.
-- Preferred loop: edit on macOS, commit and push, SSH to ECS, pull, configure, build, test.
+- Preferred loop: edit on macOS, commit and push, SSH to Windows, pull, configure, build, test.
 - Preferred remote shell: PowerShell 7 (`pwsh.exe`), with Windows PowerShell 5 only as a bootstrap fallback.
 
 Use the helper from macOS when possible:
@@ -22,31 +24,42 @@ The helper pushes the current branch, makes sure the ECS checkout exists,
 pulls the same branch there, runs the Windows environment check, and then
 optionally runs CMake build/test if the toolchain is installed.
 
-Bootstrap or refresh the ECS tool layer from macOS:
+Bootstrap or refresh the Windows tool layer from macOS:
 
 ```sh
 ./scripts/ecs/bootstrap-ecs-from-mac.sh
 ```
 
 Large installers should be downloaded on macOS and copied with `scp` whenever
-possible. The ECS host can access GitHub, but direct release-asset downloads can
+possible. Cloud hosts can access GitHub, but direct release-asset downloads can
 be very slow. `bootstrap-ecs-from-mac.sh` auto-detects the macOS Wi-Fi HTTP
 proxy or uses `LOCAL_HTTP_PROXY`, `HTTPS_PROXY`, or `HTTP_PROXY` if set.
 
 For multi-GB installer uploads to Windows OpenSSH, prefer legacy scp mode:
 
 ```sh
-scp -O -p -o Compression=no installer.iso aliyun-win:'C:/Installers/OfflinePackages/'
+scp -O -p -o Compression=no installer.iso win-home:'H:/Installers/OfflinePackages/'
 ```
 
 The default OpenSSH SFTP mode may create a 0-byte destination file and not show
 growth until close, which makes large transfer monitoring misleading.
 
+macOS privacy can block Codex from reading `~/Downloads` even when `ls` can see
+the filenames. If `shasum` or `scp` fails with `Operation not permitted`, stage
+the file into the workspace through Finder first:
+
+```sh
+mkdir -p _offline_installers
+osascript -e 'tell application "Finder" to duplicate POSIX file "/Users/zhangsitai/Downloads/file.iso" to POSIX file "/Users/zhangsitai/Documents/Codex/Module_Context/_offline_installers" with replacing'
+```
+
+Keep `_offline_installers/` ignored by Git.
+
 ## Windows Toolchain Targets
 
 The legacy GUI validation target is:
 
-- Windows Server 2022 x64
+- Windows 10/11 or Windows Server x64
 - PowerShell 7 latest stable
 - Visual Studio 2015 / MSVC 14.0 x64
 - Qt 5.9.7 `msvc2015_64`
@@ -65,20 +78,20 @@ If Qt is installed elsewhere, set:
 setx QT597_MSVC2015_64_DIR "D:\path\to\Qt\5.9.7\msvc2015_64"
 ```
 
-## ECS Commands
+## Windows Host Commands
 
-Run the environment check on ECS:
+Run the environment check on the Windows host:
 
 ```powershell
-pwsh -ExecutionPolicy Bypass -File C:\work\Module_Context\scripts\ecs\Test-WindowsBuildEnv.ps1 -RequireVS2015
+pwsh -ExecutionPolicy Bypass -File H:\Codex\Module_Context\scripts\ecs\Test-WindowsBuildEnv.ps1 -RequireVS2015
 ```
 
 Clone or update the ECS checkout and run validation:
 
 ```powershell
-pwsh -ExecutionPolicy Bypass -File C:\work\Module_Context\scripts\ecs\Sync-BuildTestFromGit.ps1 `
+pwsh -ExecutionPolicy Bypass -File H:\Codex\Module_Context\scripts\ecs\Sync-BuildTestFromGit.ps1 `
   -RepoUrl https://github.com/yuqing112256313-pixel/Module_Context.git `
-  -WorkDir C:\work\Module_Context `
+  -WorkDir H:\Codex\Module_Context `
   -Branch main `
   -Preset windows-vs2015-x64-debug
 ```
@@ -86,9 +99,9 @@ pwsh -ExecutionPolicy Bypass -File C:\work\Module_Context\scripts\ecs\Sync-Build
 Qt GUI demo preset:
 
 ```powershell
-pwsh -ExecutionPolicy Bypass -File C:\work\Module_Context\scripts\ecs\Sync-BuildTestFromGit.ps1 `
+pwsh -ExecutionPolicy Bypass -File H:\Codex\Module_Context\scripts\ecs\Sync-BuildTestFromGit.ps1 `
   -RepoUrl https://github.com/yuqing112256313-pixel/Module_Context.git `
-  -WorkDir C:\work\Module_Context `
+  -WorkDir H:\Codex\Module_Context `
   -Branch main `
   -Preset windows-vs2015-x64-qt597-debug
 ```
@@ -102,7 +115,7 @@ CMake can be installed with `scripts\ecs\Install-CMakeForWindows.ps1`.
 After installing or updating shell tooling, run:
 
 ```powershell
-pwsh -ExecutionPolicy Bypass -File C:\work\Module_Context\scripts\ecs\Initialize-EcsEncoding.ps1
+pwsh -ExecutionPolicy Bypass -File H:\Codex\Module_Context\scripts\ecs\Initialize-EcsEncoding.ps1
 ```
 
 Encoding rules:

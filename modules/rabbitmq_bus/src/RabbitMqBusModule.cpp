@@ -1701,21 +1701,16 @@ foundation::base::Result<void> RabbitMqConnectionDriver::DeclareQueue(
                 return;
             }
 
-            AMQP::QueueCallback on_queue_declared =
-                [this, spec, pending](
-                    const std::string&,
-                    uint32_t,
-                    uint32_t) {
-                    UpsertQueueSpec(spec, &config_.queues);
-                    CompletePendingResult(
-                        pending,
-                        foundation::base::MakeSuccess());
-                };
             admin_channel_->declareQueue(
                 spec.name,
                 ToQueueFlags(spec),
                 arguments.Value())
-                .onSuccess(on_queue_declared)
+                .onSuccess([this, spec, pending](const std::string&, uint32_t, uint32_t) {
+                    UpsertQueueSpec(spec, &config_.queues);
+                    CompletePendingResult(
+                        pending,
+                        foundation::base::MakeSuccess());
+                })
                 .onError([pending](const char* message) {
                     CompletePendingResult(
                         pending,
@@ -2447,20 +2442,15 @@ void RabbitMqConnectionDriver::BootstrapQueues(std::size_t index) {
         return;
     }
 
-    AMQP::QueueCallback on_queue_declared =
-        [this, spec, index](
-            const std::string&,
-            uint32_t,
-            uint32_t) {
-            FOUNDATION_LOG_INFO(
-                "RabbitMQ bootstrap declared queue '" << spec.name << "'");
-            BootstrapQueues(index + 1);
-        };
     admin_channel_->declareQueue(
         spec.name,
         ToQueueFlags(spec),
         arguments.Value())
-        .onSuccess(on_queue_declared)
+        .onSuccess([this, spec, index](const std::string&, uint32_t, uint32_t) {
+            FOUNDATION_LOG_INFO(
+                "RabbitMQ bootstrap declared queue '" << spec.name << "'");
+            BootstrapQueues(index + 1);
+        })
         .onError([this, spec](const char* message) {
             RequestDisconnect(MakeErrorMessage(
                 "Failed to declare queue '" + spec.name + "'",
@@ -2564,8 +2554,12 @@ void RabbitMqConnectionDriver::StartConsumer(std::size_t index) {
         return;
     }
 
-    AMQP::ConsumeCallback on_consumer_started =
-        [this, spec, index](const std::string& tag) {
+    runtime_it->second.channel->consume(
+        spec.queue,
+        spec.consumer_tag,
+        ToConsumeFlags(spec),
+        arguments.Value())
+        .onSuccess([this, spec, index](const std::string& tag) {
             std::map<std::string, ConsumerRuntime>::iterator runtime =
                 consumer_runtimes_.find(spec.name);
             if (runtime != consumer_runtimes_.end()) {
@@ -2576,13 +2570,7 @@ void RabbitMqConnectionDriver::StartConsumer(std::size_t index) {
                 "RabbitMQ bootstrap consumer '" << spec.name
                 << "' started with tag '" << tag << "'");
             BootstrapConsumers(index + 1);
-        };
-    runtime_it->second.channel->consume(
-        spec.queue,
-        spec.consumer_tag,
-        ToConsumeFlags(spec),
-        arguments.Value())
-        .onSuccess(on_consumer_started)
+        })
         .onReceived([this, spec](
             const AMQP::Message& message,
             std::uint64_t delivery_tag,

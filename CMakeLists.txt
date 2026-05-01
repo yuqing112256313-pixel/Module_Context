@@ -10,7 +10,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(MSVC)
-    add_compile_options(/utf-8)
+    if(MSVC_VERSION GREATER_EQUAL 1910)
+        add_compile_options(/utf-8)
+    else()
+        add_compile_options(/wd4819)
+    endif()
 endif()
 
 option(MC_BUILD_TESTS "Build test targets" ON)

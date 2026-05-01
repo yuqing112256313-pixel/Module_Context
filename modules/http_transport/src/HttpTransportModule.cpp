@@ -470,9 +470,7 @@ Result<HttpResponseInfo> HttpTransportModule::Download(
     const std::string route = NormalizeRoute(request.route);
     const SteadyClock::time_point request_begin = SteadyClock::now();
     info.setup_ms = ElapsedMillis(request_begin, download_begin);
-    httplib::Result result = client.Get(
-        route.c_str(),
-        headers,
+    httplib::ResponseHandler response_handler =
         [&info, &header_seen, &header_time, &request_begin](
             const httplib::Response& response) {
             header_seen = true;
@@ -481,7 +479,8 @@ Result<HttpResponseInfo> HttpTransportModule::Download(
             info.headers = FromHttplibHeaders(response.headers);
             info.header_wait_ms = ElapsedMillis(header_time, request_begin);
             return true;
-        },
+        };
+    httplib::ContentReceiver content_receiver =
         [this,
          &chunk_result,
          &on_chunk,
@@ -522,7 +521,12 @@ Result<HttpResponseInfo> HttpTransportModule::Download(
             received += size;
             AddBytesReceived(size);
             return true;
-        });
+        };
+    httplib::Result result = client.Get(
+        route.c_str(),
+        headers,
+        response_handler,
+        content_receiver);
 
     const SteadyClock::time_point download_end = SteadyClock::now();
     info.bytes_transferred = received;
@@ -651,12 +655,7 @@ Result<HttpResponseInfo> HttpTransportModule::Upload(
             return true;
         };
 
-    httplib::Result result = client.Put(
-        route.c_str(),
-        headers,
-        request.content_length,
-        content_provider,
-        request.content_type.c_str(),
+    httplib::ContentReceiver response_receiver =
         [&response_result, &on_response_chunk, &response_bytes](
             const char* data,
             std::size_t size) {
@@ -671,7 +670,14 @@ Result<HttpResponseInfo> HttpTransportModule::Upload(
             }
             response_bytes += size;
             return true;
-        });
+        };
+    httplib::Result result = client.Put(
+        route.c_str(),
+        headers,
+        request.content_length,
+        content_provider,
+        request.content_type,
+        response_receiver);
 
     info.bytes_transferred = response_bytes;
     if (!result) {
@@ -855,9 +861,11 @@ void HttpTransportModule::ConfigureServerRoutes() {
     server_->Get(".*", [this](const httplib::Request& req, httplib::Response& res) {
         HandleDownloadRequest(&req, &res);
     });
-    server_->Put(".*", [this](const httplib::Request& req, httplib::Response& res) {
-        HandleUploadRequest(&req, &res);
-    });
+    httplib::Server::Handler upload_handler =
+        [this](const httplib::Request& req, httplib::Response& res) {
+            HandleUploadRequest(&req, &res);
+        };
+    server_->Put(".*", upload_handler);
 }
 
 void HttpTransportModule::HandleDownloadRequest(

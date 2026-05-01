@@ -54,3 +54,6 @@ ui_*.h
 Thumbs.db
 *.swp
 *.tmp
+
+# Local offline installer staging
+_offline_installers/

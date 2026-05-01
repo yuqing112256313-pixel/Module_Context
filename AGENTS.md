@@ -212,6 +212,12 @@ Encoding rules:
   `.h` file that contains non-ASCII string literals, keep the file as UTF-8
   with BOM so VS2015 reads Chinese UI/log text correctly. Comments-only files
   do not need this, but string-literal files do.
+- For Qt 5.9 + VS2015 GUI code, a UTF-8 BOM alone only helps the compiler read
+  the source text. Narrow literals such as `"中文"` can still be emitted in the
+  compiler execution code page, while Qt 5 treats `const char*` text as UTF-8.
+  Use `QStringLiteral("中文")` for UI labels, dialog text, and log text in C++
+  sources. AUTOUIC-generated `ui_*.h` files are usually safe because `uic`
+  writes Chinese as escaped UTF-8 bytes for `QApplication::translate`.
 - Do not enable the system-wide Windows "Beta: UTF-8" locale switch unless a
   specific tool requires it; VS2015-era tools are safer with command-scoped UTF-8.
 

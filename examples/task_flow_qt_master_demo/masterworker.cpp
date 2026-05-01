@@ -298,7 +298,9 @@ void MasterWorker::Run(const DemoSettings& settings) {
         return;
     }
 
-    emit LogMessage("info", QString("本轮运行目录：%1").arg(report_dir));
+    emit LogMessage(
+        "info",
+        QStringLiteral("本轮运行目录：%1").arg(report_dir));
 
     RabbitMqAdminClient admin;
     connect(
@@ -379,11 +381,13 @@ void MasterWorker::Run(const DemoSettings& settings) {
     QtMasterObserver observer(this);
     MasterRunConfig config =
         BuildRunConfig(settings, module_config_path, report_dir, run_id);
-    emit LogMessage("info", "启动主机 E2E 内核");
+    emit LogMessage("info", QStringLiteral("启动主机 E2E 内核"));
     const int exit_code =
         RunTaskFlowMaster(config, &source, &observer, &cancel_requested_);
     if (exit_code != 0) {
-        emit LogMessage("warn", QString("主机 E2E 结束，退出码：%1").arg(exit_code));
+        emit LogMessage(
+            "warn",
+            QStringLiteral("主机 E2E 结束，退出码：%1").arg(exit_code));
     }
 
     QueueStatus final_status;
@@ -396,7 +400,7 @@ void MasterWorker::Run(const DemoSettings& settings) {
 
 void MasterWorker::RequestStop() {
     cancel_requested_.store(true);
-    emit LogMessage("warn", "收到停止请求，正在让主机内核收尾");
+    emit LogMessage("warn", QStringLiteral("收到停止请求，正在让主机内核收尾"));
 }
 
 bool MasterWorker::PrepareRuntime(
@@ -417,7 +421,7 @@ bool MasterWorker::PrepareRuntime(
     QDir qdir;
     if (!qdir.mkpath(dir)) {
         if (error_message != NULL) {
-            *error_message = QString("无法创建运行目录：%1").arg(dir);
+            *error_message = QStringLiteral("无法创建运行目录：%1").arg(dir);
         }
         return false;
     }
@@ -511,7 +515,8 @@ bool MasterWorker::WriteMasterModuleConfig(
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         if (error_message != NULL) {
             *error_message =
-                QString("无法写入 module config：%1").arg(module_config_path);
+                QStringLiteral("无法写入 module config：%1")
+                    .arg(module_config_path);
         }
         return false;
     }
@@ -599,7 +604,7 @@ bool MasterWorker::WriteLocalWorkerModuleConfig(
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         if (error_message != NULL) {
             *error_message =
-                QString("无法写入本机 worker module config：%1")
+                QStringLiteral("无法写入本机 worker module config：%1")
                     .arg(worker_config_path);
         }
         return false;
@@ -616,12 +621,13 @@ bool MasterWorker::StartLocalWorkers(
     if (!settings.autoStartLocalWorkers) {
         emit LogMessage(
             "info",
-            "RabbitMQ Host 不是 127.0.0.1，跳过桌面端本机 worker 自启动");
+            QStringLiteral(
+                "RabbitMQ Host 不是 127.0.0.1，跳过桌面端本机 worker 自启动"));
         return true;
     }
     if (workers == NULL) {
         if (error_message != NULL) {
-            *error_message = "本机 worker 进程列表不可用";
+            *error_message = QStringLiteral("本机 worker 进程列表不可用");
         }
         return false;
     }
@@ -631,10 +637,10 @@ bool MasterWorker::StartLocalWorkers(
                       << "mc_task_flow_worker_hostd.exe");
     if (worker_exe.isEmpty()) {
         if (error_message != NULL) {
-            *error_message =
+            *error_message = QStringLiteral(
                 "桌面端无法启动本机 worker：exe 同目录没有 "
                 "mc_task_flow_worker_host.exe。请重新编译 Qt demo，"
-                "或确认 CMake 已把 worker host 复制到桌面程序目录。";
+                "或确认 CMake 已把 worker host 复制到桌面程序目录。");
         }
         return false;
     }
@@ -643,7 +649,7 @@ bool MasterWorker::StartLocalWorkers(
     QDir root_dir;
     if (!root_dir.mkpath(local_root)) {
         if (error_message != NULL) {
-            *error_message = QString("无法创建本机 worker 运行目录：%1")
+            *error_message = QStringLiteral("无法创建本机 worker 运行目录：%1")
                                  .arg(local_root);
         }
         return false;
@@ -651,7 +657,7 @@ bool MasterWorker::StartLocalWorkers(
 
     emit LogMessage(
         "info",
-        QString("单机离线模式：自动启动 %1 个本机 worker，每个 worker %2 个处理线程")
+        QStringLiteral("单机离线模式：自动启动 %1 个本机 worker，每个 worker %2 个处理线程")
             .arg(settings.expectedWorkerCount)
             .arg(settings.localWorkerThreads));
 
@@ -662,7 +668,8 @@ bool MasterWorker::StartLocalWorkers(
         if (!root_dir.mkpath(worker_dir)) {
             if (error_message != NULL) {
                 *error_message =
-                    QString("无法创建本机 worker 目录：%1").arg(worker_dir);
+                    QStringLiteral("无法创建本机 worker 目录：%1")
+                        .arg(worker_dir);
             }
             return false;
         }
@@ -709,7 +716,7 @@ bool MasterWorker::StartLocalWorkers(
             delete process;
             if (error_message != NULL) {
                 *error_message =
-                    QString("启动本机 worker 失败：%1，%2")
+                    QStringLiteral("启动本机 worker 失败：%1，%2")
                         .arg(worker_exe)
                         .arg(detail);
             }
@@ -720,7 +727,8 @@ bool MasterWorker::StartLocalWorkers(
             delete process;
             if (error_message != NULL) {
                 *error_message =
-                    QString("本机 worker 启动后立即退出：%1，退出码：%2。"
+                    QStringLiteral(
+                            "本机 worker 启动后立即退出：%1，退出码：%2。"
                             "请查看日志：%3，错误日志：%4")
                         .arg(worker_id)
                         .arg(exit_code)
@@ -732,7 +740,7 @@ bool MasterWorker::StartLocalWorkers(
         workers->append(process);
         emit LogMessage(
             "info",
-            QString("本机 worker 已启动：%1，日志：%2")
+            QStringLiteral("本机 worker 已启动：%1，日志：%2")
                 .arg(worker_id)
                 .arg(worker_log_path));
     }

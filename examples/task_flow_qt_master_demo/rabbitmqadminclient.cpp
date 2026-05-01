@@ -46,7 +46,9 @@ bool RabbitMqAdminClient::BootstrapTopology(
     const QString encoded_master_user = PathSegment(master_user);
     const QString encoded_worker_user = PathSegment(worker_user);
 
-    emit LogMessage("info", "准备 RabbitMQ vhost、用户、交换机和队列");
+    emit LogMessage(
+        "info",
+        QStringLiteral("准备 RabbitMQ vhost、用户、交换机和队列"));
     if (!PutJson("/vhosts/" + encoded_vhost, QJsonObject(), error_message)) {
         return false;
     }
@@ -133,7 +135,7 @@ bool RabbitMqAdminClient::BootstrapTopology(
         return false;
     }
 
-    emit LogMessage("info", "RabbitMQ 调度拓扑已准备好");
+    emit LogMessage("info", QStringLiteral("RabbitMQ 调度拓扑已准备好"));
     return true;
 }
 
@@ -149,7 +151,7 @@ bool RabbitMqAdminClient::WaitForTaskConsumers(
     while (timeout_ms <= 0 || timer.elapsed() < timeout_ms) {
         if (cancel_requested != NULL && cancel_requested->load()) {
             if (error_message != NULL) {
-                *error_message = "等待 worker 时收到停止请求";
+                *error_message = QStringLiteral("等待 worker 时收到停止请求");
             }
             return false;
         }
@@ -158,7 +160,7 @@ bool RabbitMqAdminClient::WaitForTaskConsumers(
             if (status.taskConsumers >= expected_count) {
                 emit LogMessage(
                     "info",
-                    QString("任务消费者已就绪：%1/%2")
+                    QStringLiteral("任务消费者已就绪：%1/%2")
                         .arg(status.taskConsumers)
                         .arg(expected_count));
                 return true;
@@ -168,7 +170,7 @@ bool RabbitMqAdminClient::WaitForTaskConsumers(
     }
 
     if (error_message != NULL) {
-        *error_message = QString("等待任务消费者超时：%1/%2")
+        *error_message = QStringLiteral("等待任务消费者超时：%1/%2")
                              .arg(status.taskConsumers)
                              .arg(expected_count);
     }

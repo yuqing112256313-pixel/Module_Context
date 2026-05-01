@@ -55,7 +55,7 @@ MainWindow::MainWindow(QWidget* parent)
       image_directory_(),
       current_preview_path_() {
     ui_->setupUi(this);
-    setWindowTitle("Task Flow E2E 主机演示台");
+    setWindowTitle(QStringLiteral("Task Flow E2E 主机演示台"));
 
     SetupDynamicControls();
     SetupTables();
@@ -63,7 +63,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     ui_->graphicsView->setScene(&preview_scene_);
     ui_->graphicsView_2->setScene(&result_scene_);
-    result_scene_.addText("算法结果待接入");
+    result_scene_.addText(QStringLiteral("算法结果待接入"));
 
     connect(
         ui_->SelectImageDirButton,
@@ -101,11 +101,12 @@ MainWindow::MainWindow(QWidget* parent)
     clock_timer_.start(1000);
     UpdateClock();
     SetRunning(false);
-    SetRunState("stopped", "待启动");
-    SetRabbitState(false, "未连接");
-    SetRuntimeState(true, "就绪");
-    ui_->HostLabel->setText(QString("主机：%1").arg(QHostInfo::localHostName()));
-    ui_->IpLabel->setText(QString("IP：%1").arg(HostIpText()));
+    SetRunState("stopped", QStringLiteral("待启动"));
+    SetRabbitState(false, QStringLiteral("未连接"));
+    SetRuntimeState(true, QStringLiteral("就绪"));
+    ui_->HostLabel->setText(
+        QStringLiteral("主机：%1").arg(QHostInfo::localHostName()));
+    ui_->IpLabel->setText(QStringLiteral("IP：%1").arg(HostIpText()));
     ui_->VersionLabel->setText("Task Flow Qt Demo / Qt 5.9.7");
 }
 
@@ -122,27 +123,27 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::SetupDynamicControls() {
-    ui_->ExpectedWorkerCountLabel->setText("从机数量");
-    ui_->PublishRateLabel->setText("发布速率");
-    ui_->SharedImageRootLabel->setText("运行输出目录");
-    ui_->StartCaptureButton->setText("启动 E2E");
-    ui_->ClearSharedDirButton->setText("清理运行目录");
-    ui_->TaskFlowTitleLabel->setText("采图与调度链路");
-    ui_->RabbitMqTitleMainLabel->setText("RabbitMQ 调度状态");
-    ui_->ResultTitleMainLabel->setText("算法结果占位");
+    ui_->ExpectedWorkerCountLabel->setText(QStringLiteral("从机数量"));
+    ui_->PublishRateLabel->setText(QStringLiteral("发布速率"));
+    ui_->SharedImageRootLabel->setText(QStringLiteral("运行输出目录"));
+    ui_->StartCaptureButton->setText(QStringLiteral("启动 E2E"));
+    ui_->ClearSharedDirButton->setText(QStringLiteral("清理运行目录"));
+    ui_->TaskFlowTitleLabel->setText(QStringLiteral("采图与调度链路"));
+    ui_->RabbitMqTitleMainLabel->setText(QStringLiteral("RabbitMQ 调度状态"));
+    ui_->ResultTitleMainLabel->setText(QStringLiteral("算法结果占位"));
 }
 
 void MainWindow::SetupTables() {
     ui_->TaskStateTable->setColumnCount(8);
     ui_->TaskStateTable->setHorizontalHeaderLabels(
-        QStringList() << "序号"
-                      << "图片"
-                      << "任务"
-                      << "状态"
-                      << "从机"
-                      << "拉图"
-                      << "收正文"
-                      << "全链路");
+        QStringList() << QStringLiteral("序号")
+                      << QStringLiteral("图片")
+                      << QStringLiteral("任务")
+                      << QStringLiteral("状态")
+                      << QStringLiteral("从机")
+                      << QStringLiteral("拉图")
+                      << QStringLiteral("收正文")
+                      << QStringLiteral("全链路"));
     ui_->TaskStateTable->horizontalHeader()->setStretchLastSection(true);
     ui_->TaskStateTable->verticalHeader()->setVisible(false);
     ui_->TaskStateTable->setAlternatingRowColors(true);
@@ -150,9 +151,9 @@ void MainWindow::SetupTables() {
 
     ui_->TraceLogTable->setColumnCount(3);
     ui_->TraceLogTable->setHorizontalHeaderLabels(
-        QStringList() << "时间"
-                      << "级别"
-                      << "日志");
+        QStringList() << QStringLiteral("时间")
+                      << QStringLiteral("级别")
+                      << QStringLiteral("日志"));
     ui_->TraceLogTable->horizontalHeader()->setStretchLastSection(true);
     ui_->TraceLogTable->verticalHeader()->setVisible(false);
     ui_->TraceLogTable->setAlternatingRowColors(true);
@@ -161,7 +162,7 @@ void MainWindow::SetupTables() {
 void MainWindow::LoadSettings() {
     image_directory_ = settings_.value("imageDirectory", "").toString();
     ui_->LocalImageDirValueLabel->setText(
-        image_directory_.isEmpty() ? "未选择" : image_directory_);
+        image_directory_.isEmpty() ? QStringLiteral("未选择") : image_directory_);
     ui_->ExpectedWorkerCountEdit->setText(
         settings_.value("expectedWorkerCount", 5).toString());
     ui_->PublishRateEdit->setText(settings_.value("publishRate", 50).toString());
@@ -231,7 +232,7 @@ DemoSettings MainWindow::ReadSettings() const {
 void MainWindow::SelectImageDirectory() {
     const QString dir = QFileDialog::getExistingDirectory(
         this,
-        "选择 BMP 图像目录",
+        QStringLiteral("选择 BMP 图像目录"),
         image_directory_.isEmpty()
             ? QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
             : image_directory_);
@@ -246,7 +247,7 @@ void MainWindow::SelectImageDirectory() {
 void MainWindow::SelectOutputDirectory() {
     const QString dir = QFileDialog::getExistingDirectory(
         this,
-        "选择运行输出目录",
+        QStringLiteral("选择运行输出目录"),
         ui_->SharedImageRootEdit->text());
     if (!dir.isEmpty()) {
         ui_->SharedImageRootEdit->setText(dir);
@@ -256,7 +257,7 @@ void MainWindow::SelectOutputDirectory() {
 void MainWindow::SelectPluginDirectory() {
     const QString dir = QFileDialog::getExistingDirectory(
         this,
-        "选择插件 DLL 目录",
+        QStringLiteral("选择插件 DLL 目录"),
         ui_->PluginDirectoryEdit->text());
     if (!dir.isEmpty()) {
         ui_->PluginDirectoryEdit->setText(dir);
@@ -267,28 +268,37 @@ void MainWindow::StartRun() {
     SaveSettings();
     const DemoSettings settings = ReadSettings();
     if (settings.imageDirectory.isEmpty()) {
-        QMessageBox::warning(this, "缺少图像", "请先选择包含 BMP 的图像目录。");
+        QMessageBox::warning(
+            this,
+            QStringLiteral("缺少图像"),
+            QStringLiteral("请先选择包含 BMP 的图像目录。"));
         return;
     }
     QDir image_dir(settings.imageDirectory);
     if (image_dir.entryList(QStringList() << "*.bmp" << "*.BMP", QDir::Files)
             .isEmpty()) {
-        QMessageBox::warning(this, "缺少图像", "目录中没有 BMP 文件。");
+        QMessageBox::warning(
+            this,
+            QStringLiteral("缺少图像"),
+            QStringLiteral("目录中没有 BMP 文件。"));
         return;
     }
     if (settings.expectedWorkerCount <= 0 || settings.taskCount <= 0 ||
         settings.publishRate <= 0 || settings.httpPort <= 0) {
-        QMessageBox::warning(this, "参数错误", "从机数量、任务数量、速率和端口必须大于 0。");
+        QMessageBox::warning(
+            this,
+            QStringLiteral("参数错误"),
+            QStringLiteral("从机数量、任务数量、速率和端口必须大于 0。"));
         return;
     }
 
     task_rows_.clear();
     ui_->TaskStateTable->setRowCount(0);
     SetRunning(true);
-    SetRunState("running", "运行中");
-    SetRabbitState(false, "连接中");
-    SetRuntimeState(true, "运行中");
-    AddLogRow("info", "开始准备桌面演示版 E2E");
+    SetRunState("running", QStringLiteral("运行中"));
+    SetRabbitState(false, QStringLiteral("连接中"));
+    SetRuntimeState(true, QStringLiteral("运行中"));
+    AddLogRow("info", QStringLiteral("开始准备桌面演示版 E2E"));
 
     worker_thread_ = new QThread(this);
     worker_ = new MasterWorker();
@@ -342,13 +352,18 @@ void MainWindow::StartRun() {
 void MainWindow::StopRun() {
     if (worker_ != NULL) {
         QMetaObject::invokeMethod(worker_, "RequestStop", Qt::QueuedConnection);
-        AddLogRow("warn", "已请求停止，本轮会走主机清理和控制广播");
+        AddLogRow(
+            "warn",
+            QStringLiteral("已请求停止，本轮会走主机清理和控制广播"));
     }
 }
 
 void MainWindow::ClearRuntime() {
     if (worker_thread_ != NULL) {
-        QMessageBox::information(this, "正在运行", "请先停止当前运行。");
+        QMessageBox::information(
+            this,
+            QStringLiteral("正在运行"),
+            QStringLiteral("请先停止当前运行。"));
         return;
     }
     const QString root = ui_->SharedImageRootEdit->text().trimmed();
@@ -357,22 +372,24 @@ void MainWindow::ClearRuntime() {
     }
     QDir dir(root);
     if (!dir.exists()) {
-        AddLogRow("info", "运行目录不存在，无需清理");
+        AddLogRow("info", QStringLiteral("运行目录不存在，无需清理"));
         return;
     }
     const qint64 bytes = DirectorySize(root);
     if (QMessageBox::question(
             this,
-            "确认清理",
-            QString("将清理运行输出目录：\n%1\n约 %2")
+            QStringLiteral("确认清理"),
+            QStringLiteral("将清理运行输出目录：\n%1\n约 %2")
                 .arg(root)
                 .arg(FormatBytes(bytes))) != QMessageBox::Yes) {
         return;
     }
     if (dir.removeRecursively()) {
-        AddLogRow("info", "运行输出目录已清理");
+        AddLogRow("info", QStringLiteral("运行输出目录已清理"));
     } else {
-        AddLogRow("error", "运行输出目录清理失败，可能有文件仍被占用");
+        AddLogRow(
+            "error",
+            QStringLiteral("运行输出目录清理失败，可能有文件仍被占用"));
     }
 }
 
@@ -385,7 +402,7 @@ void MainWindow::OnLogMessage(
     const QString& message) {
     AddLogRow(level, message);
     if (level == "error") {
-        SetRunState("error", "异常");
+        SetRunState("error", QStringLiteral("异常"));
     }
 }
 
@@ -394,15 +411,15 @@ void MainWindow::OnQueueStatus(const QueueStatus& status) {
     ui_->TaskUnackedValueLabel->setText(QString::number(status.taskUnacked));
     ui_->TaskConsumersValueLabel->setText(QString::number(status.taskConsumers));
     ui_->ResultReadyValueLabel->setText(
-        QString("待消费 %1").arg(status.resultReady));
+        QStringLiteral("待消费 %1").arg(status.resultReady));
     ui_->ResultUnackedValueLabel->setText(
-        QString("处理中 %1").arg(status.resultUnacked));
+        QStringLiteral("处理中 %1").arg(status.resultUnacked));
     ui_->ResultConsumersValueLabel->setText(
-        QString("消费者 %1").arg(status.resultConsumers));
-    ui_->TelemetryReadyValueLabel->setText("广播停止");
-    ui_->TelemetryUnackedValueLabel->setText("不承载任务");
+        QStringLiteral("消费者 %1").arg(status.resultConsumers));
+    ui_->TelemetryReadyValueLabel->setText(QStringLiteral("广播停止"));
+    ui_->TelemetryUnackedValueLabel->setText(QStringLiteral("不承载任务"));
     ui_->TelemetryConsumersValueLabel->setText("fanout");
-    SetRabbitState(true, "已连接");
+    SetRabbitState(true, QStringLiteral("已连接"));
 }
 
 void MainWindow::OnTaskPublished(const TaskUiState& task) {
@@ -415,7 +432,7 @@ void MainWindow::OnTaskUpdated(const TaskUiState& task) {
     UpdateTaskRow(row, task);
     ui_->WorkerIdValueLabel->setText(task.workerId.isEmpty() ? "-" : task.workerId);
     ui_->AlgorithmMsValueLabel->setText(FormatMs(task.algorithmMs));
-    ui_->InspectionResultValueLabel->setText("待接入");
+    ui_->InspectionResultValueLabel->setText(QStringLiteral("待接入"));
     ui_->DefectCountValueLabel->setText("-");
     ui_->ResultJsonPathValueLabel->setText("-");
 }
@@ -426,7 +443,7 @@ void MainWindow::OnProgress(const ProgressState& progress) {
         seconds > 0.001 ? static_cast<double>(progress.finishedCount) / seconds
                          : 0.0;
     ui_->RunIdValueLabel->setText(
-        QString("%1/%2 完成，%3 张/秒")
+        QStringLiteral("%1/%2 完成，%3 张/秒")
             .arg(progress.finishedCount)
             .arg(progress.taskCount)
             .arg(throughput, 0, 'f', 2));
@@ -448,14 +465,16 @@ void MainWindow::OnPreviewChanged(
 void MainWindow::OnRunFinished(const RunResultState& result) {
     AddLogRow(
         result.success ? "info" : "warn",
-        QString("本轮结束：完成 %1/%2，成功 %3，失败 %4，内存仓库剩余 %5")
+        QStringLiteral("本轮结束：完成 %1/%2，成功 %3，失败 %4，内存仓库剩余 %5")
             .arg(result.finishedCount)
             .arg(result.sentCount)
             .arg(result.successCount)
             .arg(result.failureCount)
             .arg(result.imageStoreRemainingCount));
     SetRunning(false);
-    SetRunState(result.success ? "stopped" : "error", result.success ? "完成" : "结束");
+    SetRunState(
+        result.success ? "stopped" : "error",
+        result.success ? QStringLiteral("完成") : QStringLiteral("结束"));
     worker_ = NULL;
     worker_thread_ = NULL;
 }
@@ -548,7 +567,7 @@ void MainWindow::UpdatePreview(const QString& image_path) {
     QPixmap pixmap(image_path);
     preview_scene_.clear();
     if (pixmap.isNull()) {
-        preview_scene_.addText("BMP 预览加载失败");
+        preview_scene_.addText(QStringLiteral("BMP 预览加载失败"));
         return;
     }
     const QSize viewport = ui_->graphicsView->viewport()->size();

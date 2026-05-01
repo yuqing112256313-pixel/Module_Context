@@ -30,6 +30,10 @@
 )
 
 $ErrorActionPreference = 'Stop'
+trap {
+    Write-Error $_
+    exit 1
+}
 
 function Get-SettingValue {
     param(

@@ -3,6 +3,7 @@ param(
     [string]$BuildDir,
     [string]$Configuration = '',
     [string]$RabbitMqApiUrl = '',
+    [string]$RabbitMqHost = '',
     [string]$RabbitMqAdminUser = '',
     [string]$RabbitMqAdminPass = '',
     [string]$RabbitMqVHost = '',
@@ -24,10 +25,15 @@ param(
     [string]$HttpRoute = '/task-flow/images',
     [long]$ImageStoreCapacityBytes = 4294967296,
     [int]$WorkerReadyTimeoutSeconds = 300,
-    [int]$TimeoutMs = 0
+    [int]$TimeoutMs = 0,
+    [switch]$SkipIfRabbitMqUnavailable
 )
 
 $ErrorActionPreference = 'Stop'
+trap {
+    Write-Error $_
+    exit 1
+}
 
 function Get-SettingValue {
     param(
@@ -46,6 +52,57 @@ function Get-SettingValue {
     }
 
     return $FallbackValue
+}
+
+function Get-BasicAuthHeader {
+    param(
+        [string]$UserName,
+        [string]$Password
+    )
+
+    $bytes = [System.Text.Encoding]::ASCII.GetBytes("$UserName`:$Password")
+    return 'Basic {0}' -f [Convert]::ToBase64String($bytes)
+}
+
+function Test-TcpPort {
+    param(
+        [string]$HostName,
+        [int]$Port,
+        [int]$TimeoutMs = 3000
+    )
+
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $async = $client.BeginConnect($HostName, $Port, $null, $null)
+        if (-not $async.AsyncWaitHandle.WaitOne($TimeoutMs)) {
+            return $false
+        }
+        $client.EndConnect($async)
+        return $client.Connected
+    } catch {
+        return $false
+    } finally {
+        $client.Close()
+    }
+}
+
+function Test-RabbitMqApi {
+    param(
+        [string]$ApiUrl,
+        [string]$UserName,
+        [string]$Password
+    )
+
+    $headers = @{
+        Authorization = (Get-BasicAuthHeader -UserName $UserName -Password $Password)
+    }
+    $overviewUri = '{0}/overview' -f $ApiUrl.TrimEnd('/')
+    try {
+        Invoke-RestMethod -Method Get -Uri $overviewUri -Headers $headers -TimeoutSec 5 | Out-Null
+        return $true
+    } catch {
+        return $false
+    }
 }
 
 function Wait-ProcessOrThrow {
@@ -79,6 +136,7 @@ function Wait-ProcessOrThrow {
 $BuildDir = (Resolve-Path -LiteralPath $BuildDir).Path
 $Configuration = Get-SettingValue -ExplicitValue $Configuration -EnvName 'Configuration' -FallbackValue 'Debug'
 $RabbitMqApiUrl = Get-SettingValue -ExplicitValue $RabbitMqApiUrl -EnvName 'RABBITMQ_API_URL' -FallbackValue 'http://127.0.0.1:15672/api'
+$RabbitMqHost = Get-SettingValue -ExplicitValue $RabbitMqHost -EnvName 'RABBITMQ_HOST' -FallbackValue '127.0.0.1'
 $RabbitMqAdminUser = Get-SettingValue -ExplicitValue $RabbitMqAdminUser -EnvName 'RABBITMQ_ADMIN_USER' -FallbackValue 'guest'
 $RabbitMqAdminPass = Get-SettingValue -ExplicitValue $RabbitMqAdminPass -EnvName 'RABBITMQ_ADMIN_PASS' -FallbackValue 'guest'
 $RabbitMqVHost = Get-SettingValue -ExplicitValue $RabbitMqVHost -EnvName 'RABBITMQ_VHOST' -FallbackValue 'mc_integration'
@@ -89,6 +147,20 @@ $RabbitMqWorkerPass = Get-SettingValue -ExplicitValue $RabbitMqWorkerPass -EnvNa
 
 if ([string]::IsNullOrWhiteSpace($HttpEndpoint)) {
     $HttpEndpoint = 'http://127.0.0.1:{0}' -f $HttpPort
+}
+
+$rabbitApiReady = Test-RabbitMqApi `
+    -ApiUrl $RabbitMqApiUrl `
+    -UserName $RabbitMqAdminUser `
+    -Password $RabbitMqAdminPass
+$rabbitAmqpReady = Test-TcpPort -HostName $RabbitMqHost -Port 5672 -TimeoutMs 3000
+if (-not $rabbitApiReady -or -not $rabbitAmqpReady) {
+    $message = "RabbitMQ E2E prerequisites are unavailable: API=$rabbitApiReady at $RabbitMqApiUrl, AMQP=$rabbitAmqpReady at ${RabbitMqHost}:5672."
+    if ($SkipIfRabbitMqUnavailable) {
+        Write-Host "[e2e] skip: $message"
+        exit 77
+    }
+    throw $message
 }
 
 if ($WorkerCount -le 0 -or $DurationSeconds -le 0 -or $PublishRatePerSecond -le 0 -or
@@ -133,6 +205,7 @@ try {
             '-BuildDir', $BuildDir,
             '-Configuration', $Configuration,
             '-RabbitMqApiUrl', $RabbitMqApiUrl,
+            '-RabbitMqHost', $RabbitMqHost,
             '-RabbitMqAdminUser', $RabbitMqAdminUser,
             '-RabbitMqAdminPass', $RabbitMqAdminPass,
             '-RabbitMqVHost', $RabbitMqVHost,
@@ -171,6 +244,7 @@ try {
             '-File', $workerScript,
             '-BuildDir', $BuildDir,
             '-Configuration', $Configuration,
+            '-RabbitMqHost', $RabbitMqHost,
             '-RabbitMqVHost', $RabbitMqVHost,
             '-RabbitMqWorkerUser', $RabbitMqWorkerUser,
             '-RabbitMqWorkerPass', $RabbitMqWorkerPass,

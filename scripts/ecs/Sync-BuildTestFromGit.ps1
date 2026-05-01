@@ -3,6 +3,7 @@ param(
     [string]$WorkDir = "C:\work\Module_Context",
     [string]$Branch = "main",
     [string]$Preset = "windows-vs2015-x64-debug",
+    [string]$GitHttpProxy = "",
     [switch]$SkipBuild,
     [switch]$SkipTests
 )
@@ -47,26 +48,71 @@ function Invoke-Checked {
     }
 }
 
+function Test-TcpPort {
+    param(
+        [string]$HostName,
+        [int]$Port,
+        [int]$TimeoutMs = 500
+    )
+
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $async = $client.BeginConnect($HostName, $Port, $null, $null)
+        if (-not $async.AsyncWaitHandle.WaitOne($TimeoutMs)) {
+            return $false
+        }
+        $client.EndConnect($async)
+        return $client.Connected
+    } catch {
+        return $false
+    } finally {
+        $client.Close()
+    }
+}
+
+function Get-GitProxyArguments {
+    $proxy = $GitHttpProxy
+    if ([string]::IsNullOrWhiteSpace($proxy)) {
+        $proxy = [Environment]::GetEnvironmentVariable("REMOTE_GIT_HTTP_PROXY")
+    }
+    if ([string]::IsNullOrWhiteSpace($proxy) -and
+        (Test-TcpPort -HostName "127.0.0.1" -Port 7897 -TimeoutMs 500)) {
+        $proxy = "http://127.0.0.1:7897"
+    }
+    if ([string]::IsNullOrWhiteSpace($proxy)) {
+        return @()
+    }
+
+    Write-Host "Using Git HTTP proxy: $proxy"
+    return @("-c", "http.proxy=$proxy", "-c", "https.proxy=$proxy")
+}
+
 $git = Find-Exe "git.exe" @(
     "C:\Program Files\Git\cmd\git.exe",
     "C:\Program Files\Git\bin\git.exe"
 )
+$gitProxyArgs = Get-GitProxyArguments
+
+function Invoke-GitChecked {
+    param([string[]]$Arguments)
+    Invoke-Checked $git ($gitProxyArgs + $Arguments)
+}
 
 $parent = Split-Path -Parent $WorkDir
 New-Item -ItemType Directory -Force -Path $parent | Out-Null
 
 if (Test-Path (Join-Path $WorkDir ".git")) {
     Write-Host "Updating existing checkout: $WorkDir"
-    & $git -C $WorkDir fetch origin
-    & $git -C $WorkDir checkout $Branch
-    & $git -C $WorkDir pull --ff-only origin $Branch
+    Invoke-GitChecked @("-C", $WorkDir, "fetch", "origin")
+    Invoke-GitChecked @("-C", $WorkDir, "checkout", $Branch)
+    Invoke-GitChecked @("-C", $WorkDir, "pull", "--ff-only", "origin", $Branch)
 } else {
     if (Test-Path $WorkDir) {
         throw "$WorkDir exists but is not a Git checkout."
     }
 
     Write-Host "Cloning $RepoUrl -> $WorkDir"
-    & $git clone --branch $Branch $RepoUrl $WorkDir
+    Invoke-GitChecked @("clone", "--branch", $Branch, $RepoUrl, $WorkDir)
 }
 
 $envCheck = Join-Path $WorkDir "scripts\ecs\Test-WindowsBuildEnv.ps1"

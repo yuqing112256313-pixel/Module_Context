@@ -133,6 +133,13 @@ if(TARGET rabbitmq_bus)
                 -File ${CMAKE_CURRENT_SOURCE_DIR}/../examples/task_flow/run_task_flow_e2e.ps1
                 -BuildDir ${CMAKE_BINARY_DIR}
                 -Configuration $<CONFIG>
+                -SkipIfRabbitMqUnavailable
+        )
+        set_tests_properties(
+            mc_rabbitmq_task_flow_e2e
+            PROPERTIES
+                SKIP_RETURN_CODE 77
+                TIMEOUT 420
         )
     endif()
 endif()

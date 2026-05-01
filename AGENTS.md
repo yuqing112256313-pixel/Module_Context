@@ -38,6 +38,10 @@ directly into `H:\Installers`. Cloud hosts can access GitHub, but direct
 release-asset downloads can be very slow. `bootstrap-ecs-from-mac.sh`
 auto-detects the macOS Wi-Fi HTTP proxy or uses `LOCAL_HTTP_PROXY`,
 `HTTPS_PROXY`, or `HTTP_PROXY` if set.
+`push-and-verify.sh` and `Sync-BuildTestFromGit.ps1` also auto-detect the
+Windows proxy on `127.0.0.1:7897` for Git operations. If a Git fetch/pull/clone
+prints `fatal`, treat it as a hard failure instead of continuing a build from a
+possibly stale checkout.
 
 For multi-GB installer uploads to Windows OpenSSH, prefer legacy scp mode:
 
@@ -220,6 +224,9 @@ Debugger note:
 - For VS2015 builds, `CMakeLists.txt` suppresses C4819 instead of passing the
   unsupported `/utf-8` flag. Do not re-add `/utf-8` unless the compiler is
   upgraded to a VS2017-era toolset or newer.
+- The Qt preset builds the task-flow GUI. Its RabbitMQ E2E CTest entry skips
+  with return code 77 when the local RabbitMQ Management API or AMQP port is
+  unavailable; install/start RabbitMQ when the E2E path itself must be verified.
 - Prefer CMake presets over ad hoc command lines.
 - Keep Windows-specific validation scripts under `scripts/ecs/`.
 - Do not assume macOS can validate MSVC or Qt 5.9.7 behavior.

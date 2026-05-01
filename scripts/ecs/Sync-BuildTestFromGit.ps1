@@ -58,7 +58,7 @@ if (Test-Path $envCheck) {
     $requireQt = $Preset -match "qt"
     $requireNinja = $Preset -match "ninja|mingw|llvm"
     & powershell -NoProfile -ExecutionPolicy Bypass -File $envCheck `
-        -RequireVS2015:$requireVs2015 `
+        -RequireVS2015 $requireVs2015 `
         -RequireQt:$requireQt `
         -RequireNinja:$requireNinja
     $envExit = $LASTEXITCODE

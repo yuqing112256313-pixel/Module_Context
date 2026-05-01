@@ -46,7 +46,11 @@ if (-not $asset) {
 $installerPath = Join-Path $DownloadDir $asset.name
 if (-not (Test-Path $installerPath) -or $Force) {
     Write-Host "Downloading $($asset.name)..."
-    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installerPath
+    & curl.exe -L --fail --connect-timeout 20 --max-time 600 `
+        -o $installerPath $asset.browser_download_url
+    if ($LASTEXITCODE -ne 0) {
+        throw "curl failed with exit code $LASTEXITCODE."
+    }
 }
 
 Write-Host "Installing Git for Windows silently..."

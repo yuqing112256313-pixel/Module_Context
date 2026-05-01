@@ -162,10 +162,11 @@ Encoding rules:
   writing ad hoc SSH commands that may print Chinese.
 - Keep Git configured with `core.quotepath=false` and UTF-8 log/commit output.
 - Always check the exact VS2015 compiler patch level with `cl` before treating
-  a compile error as a product-code issue. `win-home` currently reports
-  MSVC `19.00.23026`, an early VS2015 toolset; another VS2015 Update 3 or newer
-  machine can accept code that this compiler rejects.
-- MSVC `19.00.23026` does not understand `/utf-8`,
+  a compile error as a product-code issue. Early VS2015 installs can report
+  MSVC `19.00.23026`; VS2015 Update 3 on `win-home` reports
+  MSVC `19.00.24210` and MSBuild `14.0.25420.1`. Code that fails on the early
+  toolset may compile cleanly after the Update 3 toolchain is installed.
+- Early MSVC `19.00.23026` does not understand `/utf-8`,
   `/source-charset:utf-8`, or `/execution-charset:utf-8`. For any `.cpp` or
   `.h` file that contains non-ASCII string literals, keep the file as UTF-8
   with BOM so VS2015 reads Chinese UI/log text correctly. Comments-only files
@@ -231,7 +232,8 @@ Debugger note:
 - Early VS2015 toolsets can fail overload resolution on lambdas passed directly
   to heavily overloaded APIs such as `cpp-httplib` and AMQP-CPP. Before changing
   module code for this, compare the `cl` version with the known-good Windows
-  machine; upgrading VS2015 to Update 3 may be the cleaner path.
+  machine and upgrade to VS2015 Update 3 first; on `win-home`, Update 3 compiled
+  the original module callbacks successfully.
 - Do not pass `/utf-8` to early VS2015; it is ignored and can hide the real
   encoding problem. Use UTF-8 BOM for C++ files with Chinese string literals.
 - The Qt preset can build the task-flow GUI without RabbitMQ, but the RabbitMQ

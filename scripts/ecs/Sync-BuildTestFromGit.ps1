@@ -9,6 +9,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$utf8 = New-Object System.Text.UTF8Encoding $false
+[Console]::InputEncoding = $utf8
+[Console]::OutputEncoding = $utf8
+$OutputEncoding = $utf8
+& chcp.com 65001 > $null
+
 function Find-Exe {
     param(
         [string]$Name,
@@ -57,6 +63,14 @@ if (Test-Path $envCheck) {
     $requireVs2015 = $Preset -match "vs2015"
     $requireQt = $Preset -match "qt"
     $requireNinja = $Preset -match "ninja|mingw|llvm"
+    $psExe = "powershell"
+    $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+    if (-not $pwsh -and (Test-Path "C:\Program Files\PowerShell\7\pwsh.exe")) {
+        $psExe = "C:\Program Files\PowerShell\7\pwsh.exe"
+    } elseif ($pwsh) {
+        $psExe = $pwsh.Source
+    }
+
     $envCheckArgs = @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -65,7 +79,7 @@ if (Test-Path $envCheck) {
     if ($requireVs2015) { $envCheckArgs += "-RequireVS2015" }
     if ($requireQt) { $envCheckArgs += "-RequireQt" }
     if ($requireNinja) { $envCheckArgs += "-RequireNinja" }
-    & powershell @envCheckArgs
+    & $psExe @envCheckArgs
     $envExit = $LASTEXITCODE
     if ($envExit -ne 0) {
         Write-Host "Environment is incomplete; checkout was updated but build is skipped."

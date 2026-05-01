@@ -15,10 +15,17 @@ fi
 git push -u origin "${BRANCH}"
 
 remote_script="$(mktemp)"
-trap 'rm -f "${remote_script}"' EXIT
+remote_launcher="$(mktemp)"
+trap 'rm -f "${remote_script}" "${remote_launcher}"' EXIT
 
 cat >"${remote_script}" <<PS1
 \$ErrorActionPreference = "Stop"
+\$utf8 = New-Object System.Text.UTF8Encoding \$false
+[Console]::InputEncoding = \$utf8
+[Console]::OutputEncoding = \$utf8
+\$OutputEncoding = \$utf8
+& chcp.com 65001 > \$null
+
 \$repoUrl = "${REPO_URL}"
 \$workDir = "${REMOTE_WORKDIR}"
 \$branch = "${BRANCH}"
@@ -49,8 +56,30 @@ if (Test-Path (Join-Path \$workDir ".git")) {
 }
 
 \$syncScript = Join-Path \$workDir "scripts\\ecs\\Sync-BuildTestFromGit.ps1"
-& powershell -NoProfile -ExecutionPolicy Bypass -File \$syncScript -RepoUrl \$repoUrl -WorkDir \$workDir -Branch \$branch -Preset \$preset
+\$pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+if (-not \$pwsh -and (Test-Path "C:\\Program Files\\PowerShell\\7\\pwsh.exe")) {
+    \$psExe = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+} elseif (\$pwsh) {
+    \$psExe = \$pwsh.Source
+} else {
+    \$psExe = "powershell.exe"
+}
+
+& \$psExe -NoLogo -NoProfile -ExecutionPolicy Bypass -File \$syncScript -RepoUrl \$repoUrl -WorkDir \$workDir -Branch \$branch -Preset \$preset
 exit \$LASTEXITCODE
 PS1
 
-ssh "${SSH_ALIAS}" 'powershell -NoProfile -ExecutionPolicy Bypass -Command -' <"${remote_script}"
+cat >"${remote_launcher}" <<'CMD'
+@echo off
+chcp 65001 >NUL
+if exist "C:\Program Files\PowerShell\7\pwsh.exe" (
+  "C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Windows\Temp\module_context_push_verify.ps1"
+) else (
+  powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Windows\Temp\module_context_push_verify.ps1"
+)
+exit /b %ERRORLEVEL%
+CMD
+
+scp "${remote_script}" "${SSH_ALIAS}:C:/Windows/Temp/module_context_push_verify.ps1" >/dev/null
+scp "${remote_launcher}" "${SSH_ALIAS}:C:/Windows/Temp/module_context_push_verify.cmd" >/dev/null
+ssh "${SSH_ALIAS}" 'cmd /d /c C:\Windows\Temp\module_context_push_verify.cmd'

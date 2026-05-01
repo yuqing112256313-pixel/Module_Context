@@ -8,6 +8,12 @@ param(
 $ErrorActionPreference = "Continue"
 $script:Missing = New-Object System.Collections.Generic.List[string]
 
+$utf8 = New-Object System.Text.UTF8Encoding $false
+[Console]::InputEncoding = $utf8
+[Console]::OutputEncoding = $utf8
+$OutputEncoding = $utf8
+& chcp.com 65001 > $null
+
 function Add-Missing {
     param([string]$Message)
     $script:Missing.Add($Message) | Out-Null

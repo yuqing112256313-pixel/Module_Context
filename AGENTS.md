@@ -74,6 +74,7 @@ powershell -ExecutionPolicy Bypass -File C:\work\Module_Context\scripts\ecs\Sync
 ## Installation Notes
 
 Git can be installed with `scripts\ecs\Install-GitForWindows.ps1`.
+CMake can be installed with `scripts\ecs\Install-CMakeForWindows.ps1`.
 
 VS2015 and Qt 5.9.7 are best installed from official offline installers or
 verified local archives because public download links and account requirements

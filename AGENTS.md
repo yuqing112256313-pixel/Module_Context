@@ -30,18 +30,16 @@ Bootstrap or refresh the Windows tool layer from macOS:
 ./scripts/ecs/bootstrap-ecs-from-mac.sh
 ```
 
-Large installers should be downloaded on macOS and copied with `scp` whenever
-possible only when the installer already lives on macOS. `win-home` has good
-network and a local HTTP proxy at `http://127.0.0.1:7897`; for new downloads on
-that PC, prefer remote `curl.exe --proxy http://127.0.0.1:7897 -L --fail ...`
-directly into `H:\Installers`. Cloud hosts can access GitHub, but direct
-release-asset downloads can be very slow. `bootstrap-ecs-from-mac.sh`
-auto-detects the macOS Wi-Fi HTTP proxy or uses `LOCAL_HTTP_PROXY`,
-`HTTPS_PROXY`, or `HTTP_PROXY` if set.
-`push-and-verify.sh` and `Sync-BuildTestFromGit.ps1` also auto-detect the
-Windows proxy on `127.0.0.1:7897` for Git operations. If a Git fetch/pull/clone
-prints `fatal`, treat it as a hard failure instead of continuing a build from a
-possibly stale checkout.
+Large installers should be downloaded on macOS and copied with `scp` only when
+the installer already lives on macOS. `win-home` has good network and a local
+HTTP proxy at `http://127.0.0.1:7897`; for new downloads on that PC, prefer
+remote `curl.exe --proxy http://127.0.0.1:7897 -L --fail ...` directly into
+`H:\Installers`. Cloud hosts can access GitHub, but direct release-asset
+downloads can be very slow. If GitHub fetch/pull/clone from Windows is flaky,
+use the Windows proxy for Git as well, for example
+`git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 ...`.
+If a Git command prints `fatal`, treat it as a hard failure instead of
+continuing a build from a possibly stale checkout.
 
 For multi-GB installer uploads to Windows OpenSSH, prefer legacy scp mode:
 
@@ -112,6 +110,11 @@ If Qt is installed elsewhere, set:
 setx QT597_MSVC2015_64_DIR "D:\path\to\Qt\5.9.7\msvc2015_64"
 ```
 
+On `win-home`, Qt is installed at `H:\Qt\Qt5.9.7\5.9.7\msvc2015_64`.
+Keep both `QT597_MSVC2015_64_DIR` and `QTDIR` pointed there, and keep
+`H:\Qt\Qt5.9.7\5.9.7\msvc2015_64\bin` on the user `Path` so `qmake.exe` and
+Qt runtime DLLs are visible from fresh SSH/Desktop sessions.
+
 ## Windows Host Commands
 
 Run the environment check on the Windows host:
@@ -158,11 +161,15 @@ Encoding rules:
 - Launch remote commands through `cmd /d /c "chcp 65001 >NUL && pwsh ..."` when
   writing ad hoc SSH commands that may print Chinese.
 - Keep Git configured with `core.quotepath=false` and UTF-8 log/commit output.
-- The installed VS2015 compiler is MSVC 19.00.23026 and does not understand
-  `/utf-8`, `/source-charset:utf-8`, or `/execution-charset:utf-8`. For any
-  `.cpp` or `.h` file that contains non-ASCII string literals, keep the file as
-  UTF-8 with BOM so VS2015 reads Chinese UI/log text correctly. Comments-only
-  files do not need this, but string-literal files do.
+- Always check the exact VS2015 compiler patch level with `cl` before treating
+  a compile error as a product-code issue. `win-home` currently reports
+  MSVC `19.00.23026`, an early VS2015 toolset; another VS2015 Update 3 or newer
+  machine can accept code that this compiler rejects.
+- MSVC `19.00.23026` does not understand `/utf-8`,
+  `/source-charset:utf-8`, or `/execution-charset:utf-8`. For any `.cpp` or
+  `.h` file that contains non-ASCII string literals, keep the file as UTF-8
+  with BOM so VS2015 reads Chinese UI/log text correctly. Comments-only files
+  do not need this, but string-literal files do.
 - Do not enable the system-wide Windows "Beta: UTF-8" locale switch unless a
   specific tool requires it; VS2015-era tools are safer with command-scoped UTF-8.
 
@@ -221,12 +228,16 @@ Debugger note:
 ## Build Notes
 
 - Keep C++ changes compatible with C++11 and MSVC 14.0.
-- For VS2015 builds, `CMakeLists.txt` suppresses C4819 instead of passing the
-  unsupported `/utf-8` flag. Do not re-add `/utf-8` unless the compiler is
-  upgraded to a VS2017-era toolset or newer.
-- The Qt preset builds the task-flow GUI. Its RabbitMQ E2E CTest entry skips
-  with return code 77 when the local RabbitMQ Management API or AMQP port is
-  unavailable; install/start RabbitMQ when the E2E path itself must be verified.
+- Early VS2015 toolsets can fail overload resolution on lambdas passed directly
+  to heavily overloaded APIs such as `cpp-httplib` and AMQP-CPP. Before changing
+  module code for this, compare the `cl` version with the known-good Windows
+  machine; upgrading VS2015 to Update 3 may be the cleaner path.
+- Do not pass `/utf-8` to early VS2015; it is ignored and can hide the real
+  encoding problem. Use UTF-8 BOM for C++ files with Chinese string literals.
+- The Qt preset can build the task-flow GUI without RabbitMQ, but the RabbitMQ
+  E2E test needs both Management API `15672` and AMQP `5672`. If those ports are
+  unavailable, the E2E test should skip or fail explicitly, not appear green by
+  accident.
 - Prefer CMake presets over ad hoc command lines.
 - Keep Windows-specific validation scripts under `scripts/ecs/`.
 - Do not assume macOS can validate MSVC or Qt 5.9.7 behavior.

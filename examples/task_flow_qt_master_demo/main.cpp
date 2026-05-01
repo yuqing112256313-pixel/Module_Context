@@ -47,9 +47,6 @@ bool SaveWindowScreenshot(MainWindow* window, const QString& path) {
 
 int main(int argc, char* argv[]) {
     const QString screenshot_path = ScreenshotPathFromArgs(argc, argv);
-    if (!screenshot_path.isEmpty() && qgetenv("QT_QPA_PLATFORM").isEmpty()) {
-        qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen"));
-    }
 
     QApplication app(argc, argv);
 

@@ -88,8 +88,11 @@ scp -O win-home:'H:/Codex/Screenshots/qt-master-demo.png' _remote_screenshots/
 ```
 
 This validates rendering and Chinese text without opening an interactive remote
-desktop. If a truly interactive desktop session is required, ask the user before
-using it and keep SSH validation paused until that session is closed.
+desktop. Let Qt use the default Windows platform plugin for this screenshot.
+Forcing `QT_QPA_PLATFORM=offscreen` on Qt 5.9.7 produced a misleading image
+with control outlines but no text. If a truly interactive desktop session is
+required, ask the user before using it and keep SSH validation paused until
+that session is closed.
 
 ## Encoding Rules
 
@@ -170,6 +173,21 @@ For GitHub access through the proxy:
 
 ```powershell
 git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 fetch origin
+```
+
+After a reboot, user-session proxy software may not be running because no one
+opened the Windows desktop. If `7897` is not listening and direct GitHub access
+fails, use an SSH-transferred Git bundle as the validation fallback:
+
+```sh
+git bundle create /tmp/module_context.bundle main
+scp -O -p /tmp/module_context.bundle win-home:'H:/Installers/module_context.bundle'
+```
+
+```powershell
+Set-Location H:\Codex\Module_Context
+git fetch H:/Installers/module_context.bundle main
+git merge --ff-only FETCH_HEAD
 ```
 
 For large uploads from macOS to Windows OpenSSH, prefer legacy scp mode:

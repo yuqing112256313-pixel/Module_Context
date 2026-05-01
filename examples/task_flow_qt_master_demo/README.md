@@ -56,4 +56,4 @@ Qt demo 构建后会把 `mc_task_flow_worker_host.exe`、`rabbitmq_bus.dll`、
 .\mc_task_flow_qt_master_demod.exe --screenshot H:\Codex\Screenshots\qt-master-demo.png
 ```
 
-这个模式会使用 Qt offscreen 平台插件，不需要 Windows App / RDP 会话。
+这个模式使用默认 Windows Qt 平台即可，不需要 Windows App / RDP 会话。

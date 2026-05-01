@@ -34,6 +34,8 @@ void ServiceRegistry::RegisterKnownServices(
         return;
     }
 
+    // 当前框架采用显式白名单登记服务接口。新增公开服务接口时，应在这里补充
+    // dynamic_cast 分支，并在对应公开头文件中提供 ServiceTypeTraits 特化。
     if (dynamic_cast<module_context::messaging::IMessageBusService*>(provider) != NULL) {
         Register(
             ServiceTypeTraits<module_context::messaging::IMessageBusService>::Key(),

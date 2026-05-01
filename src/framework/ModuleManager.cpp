@@ -42,6 +42,7 @@ static const char kConfigTypeKey[] = "type";
 static const char kConfigLibraryPathKey[] = "library_path";
 static const char kConfigInlineConfigKey[] = "config";
 
+// 错误信息在下层保留具体原因，在上层补充业务上下文，便于定位是哪一层失败。
 std::string BuildMessage(const std::string& prefix, const std::string& detail) {
     if (detail.empty()) {
         return prefix;
@@ -152,6 +153,7 @@ foundation::base::Result<ModuleConfigSpec> ParseModuleConfigEntry(
     return foundation::base::Result<ModuleConfigSpec>(spec);
 }
 
+// 只接受明确版本的配置 schema，避免旧配置被静默解释成新语义。
 foundation::base::Result<std::vector<ModuleConfigSpec> > ReadModuleConfig(
     const std::string& config_file_path) {
     foundation::config::ConfigReader reader;
@@ -290,6 +292,8 @@ foundation::base::Result<void> AssignModuleName(
     return foundation::base::MakeSuccess();
 }
 
+// 配置中的 type 是对插件实现的约束，不只是文档字段。装载阶段立即校验，
+// 可以把“配错库/配错类型”的问题挡在生命周期启动之前。
 foundation::base::Result<void> ValidateConfiguredModule(
     const ModuleConfigSpec& spec,
     IModule* module) {
@@ -558,6 +562,12 @@ foundation::base::Result<void> ModuleManager::Stop() {
          ++it) {
         ModuleMap::iterator module = modules_by_name_.find(*it);
         if (module == modules_by_name_.end() || !module->second.IsValid()) {
+            continue;
+        }
+
+        // Stop 只处理已启动模块。Init 失败或 Start 部分失败后，未启动模块交给
+        // Fini 释放初始化阶段资源，避免用无效状态错误掩盖真正的停止错误。
+        if (module->second->State() != ModuleState::Started) {
             continue;
         }
 

@@ -134,6 +134,7 @@ foundation::base::Result<void> ModuleBase::Init(IContext& ctx) {
     ctx_ = &ctx;
     foundation::base::Result<void> init_result = OnInit();
     if (!init_result.IsOk()) {
+        // 初始化失败时撤回上下文注入，避免半初始化模块继续访问外部服务。
         ctx_ = NULL;
         return PrefixHookError("Init", ModuleName(), init_result);
     }
@@ -185,6 +186,7 @@ foundation::base::Result<void> ModuleBase::Fini() {
             first_error = PrefixHookError("Fini", ModuleName(), stop_result);
         }
 
+        // 即使 Stop 钩子报错，也继续执行 Fini 钩子，尽量释放初始化阶段资源。
         cleanup_state = ModuleState::Stopped;
     }
 

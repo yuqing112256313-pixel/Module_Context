@@ -164,6 +164,24 @@ expect it to survive after SSH exits. Use the manual Windows service.
 
 ## Network And Transfer Notes
 
+On macOS, the user's local proxy is also available at `http://127.0.0.1:7897`.
+For slow or hanging GitHub/Homebrew/download traffic from macOS, run the command
+with proxy environment variables instead of waiting on a direct connection:
+
+```sh
+HTTP_PROXY=http://127.0.0.1:7897 \
+HTTPS_PROXY=http://127.0.0.1:7897 \
+ALL_PROXY=http://127.0.0.1:7897 \
+HOMEBREW_NO_AUTO_UPDATE=1 \
+brew install --cask libreoffice
+```
+
+For one-off Git commands on macOS:
+
+```sh
+git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 fetch origin
+```
+
 `win-home` has a local proxy at `http://127.0.0.1:7897`, but probe it after a
 reboot before depending on it. For downloads on the PC, prefer:
 
@@ -230,6 +248,10 @@ Keep `_offline_installers/` and `_remote_screenshots/` out of Git.
 - Prefer CMake presets over ad hoc command lines.
 - Keep Windows-specific validation scripts under `scripts/ecs/`.
 - Do not assume macOS can validate MSVC or Qt 5.9.7 behavior.
+- On macOS, run the CMake configure step before rebuilding after a clean
+  checkout or after restoring `third_party/Foundation`; configure patches
+  Foundation's Apple platform detection locally. A direct build can fail with
+  `Unsupported platform`.
 - The Qt preset can build the task-flow GUI without RabbitMQ; RabbitMQ E2E needs
   both Management API `15672` and AMQP `5672`.
 - PowerShell variable names are case-insensitive; avoid `$home` as a local

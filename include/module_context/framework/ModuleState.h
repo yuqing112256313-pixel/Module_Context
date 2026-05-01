@@ -5,6 +5,9 @@ namespace framework {
 
 /**
  * @brief 模块在上下文中的生命周期状态。
+ *
+ * 状态只描述框架视角下的生命周期阶段，不表达业务健康度。模块业务健康度应通过
+ * 独立服务接口或诊断接口暴露。
  */
 enum class ModuleState {
     Created = 0,  ///< 模块对象已构造，但尚未执行 `Init()`。

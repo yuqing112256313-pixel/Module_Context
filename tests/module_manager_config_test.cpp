@@ -207,6 +207,73 @@ bool RunValidInlineConfigCase() {
     return true;
 }
 
+bool RunStopSkipsModulesThatNeverStartedCase() {
+    std::ostringstream config;
+    config
+        << "{\n"
+        << "  \"schema_version\": 2,\n"
+        << "  \"modules\": [\n"
+        << "    {\n"
+        << "      \"name\": \"started_module\",\n"
+        << "      \"type\": \"config_test_module\",\n"
+        << "      \"library_path\": \"" << JsonEscape(MC_TEST_CONFIG_PLUGIN_PATH) << "\",\n"
+        << "      \"config\": {\"role\": \"master\"}\n"
+        << "    },\n"
+        << "    {\n"
+        << "      \"name\": \"start_fails_module\",\n"
+        << "      \"type\": \"config_test_module\",\n"
+        << "      \"library_path\": \"" << JsonEscape(MC_TEST_CONFIG_PLUGIN_PATH) << "\",\n"
+        << "      \"config\": {\"role\": \"worker\", \"fail_on_start\": true}\n"
+        << "    },\n"
+        << "    {\n"
+        << "      \"name\": \"not_started_module\",\n"
+        << "      \"type\": \"config_test_module\",\n"
+        << "      \"library_path\": \"" << JsonEscape(MC_TEST_CONFIG_PLUGIN_PATH) << "\",\n"
+        << "      \"config\": {\"role\": \"worker\"}\n"
+        << "    }\n"
+        << "  ]\n"
+        << "}\n";
+
+    if (!WriteConfigFile("module_manager_config_partial_start.json", config.str())) {
+        return false;
+    }
+
+    module_context::framework::ModuleManager manager;
+    foundation::base::Result<void> load_result =
+        manager.LoadModules(ConfigPath("module_manager_config_partial_start.json"));
+    if (!Expect(load_result.IsOk(), "LoadModules should accept partial-start config")) {
+        return false;
+    }
+
+    DummyContext context(&manager);
+    foundation::base::Result<void> init_result = manager.Init(context);
+    if (!Expect(init_result.IsOk(), "Init should succeed before partial Start")) {
+        return false;
+    }
+
+    foundation::base::Result<void> start_result = manager.Start();
+    if (!Expect(
+            !start_result.IsOk() &&
+                start_result.GetError() == foundation::base::ErrorCode::kInvalidState,
+            "Start should fail on the configured failing module")) {
+        return false;
+    }
+
+    foundation::base::Result<void> stop_result = manager.Stop();
+    if (!Expect(
+            stop_result.IsOk(),
+            "Stop should ignore modules that never reached Started")) {
+        return false;
+    }
+
+    foundation::base::Result<void> fini_result = manager.Fini();
+    if (!Expect(fini_result.IsOk(), "Fini should clean up after partial Start")) {
+        return false;
+    }
+
+    return true;
+}
+
 bool RunConfigMustBeObjectCase() {
     std::ostringstream config;
     config
@@ -521,6 +588,9 @@ bool RunMissingLibraryPathCase() {
 
 int main() {
     if (!RunValidInlineConfigCase()) {
+        return 1;
+    }
+    if (!RunStopSkipsModulesThatNeverStartedCase()) {
         return 1;
     }
     if (!RunConfigMustBeObjectCase()) {

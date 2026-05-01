@@ -17,8 +17,12 @@ class IContext;
 /**
  * @brief 模块装载与模块实例查询接口。
  *
- * 该接口负责模块配置加载、插件实例创建、生命周期驱动以及模块实例级查询。
- * 服务接口发现统一通过 `IContext::GetService()` 完成，不在此接口暴露。
+ * 模块管理器负责把配置中的模块声明转化为运行时模块实例，并统一驱动这些实例的
+ * 生命周期。它关注“模块对象本身”的管理；面向业务能力的发现统一通过
+ * `IContext::GetService()` 完成。
+ *
+ * 当前实现按装载顺序执行 `Init()` / `Start()`，按逆序执行 `Stop()` / `Fini()`，
+ * 用这种栈式语义表达模块间依赖：先加载的基础模块可被后加载模块依赖。
  */
 class MC_FRAMEWORK_API IModuleManager {
 public:
@@ -30,6 +34,10 @@ public:
     /**
      * @brief 根据配置文件批量加载模块。
      *
+     * 配置文件使用当前框架支持的 schema，至少应包含 `schema_version` 和 `modules`。
+     * `modules[*].name` 是实例名，`modules[*].type` 是插件声明的模块类型名，
+     * `modules[*].library_path` 是插件动态库路径。
+     *
      * @param config_file_path 模块配置文件路径。
      * @return 成功返回 `Ok`；失败时返回配置解析或插件加载错误。
      */
@@ -37,6 +45,9 @@ public:
         const std::string& config_file_path) = 0;
     /**
      * @brief 直接加载单个模块实例。
+     *
+     * 该接口适合测试、工具程序或由调用方自行管理配置的场景。通过该接口加载的模块
+     * 会得到一个空对象配置。
      *
      * @param name 模块实例名。
      * @param library_path 模块动态库路径。
@@ -60,7 +71,9 @@ public:
      */
     virtual foundation::base::Result<void> Start() = 0;
     /**
-     * @brief 按逆序停止已装载模块。
+     * @brief 按逆序停止已启动模块。
+     *
+     * 未启动或启动失败的模块不会执行 `Stop()`，其初始化资源由后续 `Fini()` 释放。
      *
      * @return 成功返回 `Ok`；失败时返回首个停止错误。
      */
@@ -75,6 +88,9 @@ public:
     /**
      * @brief 读取指定模块实例的配置对象。
      *
+     * 返回的是配置文件中 `modules[*].config` 对象的副本。若模块通过 `LoadModule()`
+     * 直接加载，则返回空对象。
+     *
      * @param name 模块实例名。
      * @return 成功时返回配置对象；未找到时返回 `kNotFound`。
      */
@@ -87,6 +103,9 @@ public:
      * @tparam T 期望的模块接口类型。
      * @param name 模块实例名。
      * @return 成功时返回类型转换后的模块指针；未找到或类型不匹配时返回错误。
+     *
+     * @note 该接口用于管理模块实例本身。若调用方只需要某种业务能力，优先使用
+     *       `IContext::GetService<T>()`，以保持模块实现与能力接口解耦。
      */
     template <typename T>
     foundation::base::Result<T*> Module(const std::string& name) {

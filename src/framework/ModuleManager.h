@@ -17,6 +17,13 @@
 namespace module_context {
 namespace framework {
 
+/**
+ * @brief 模块管理器默认实现。
+ *
+ * 该类把配置解析、插件装载、模块实例保存、生命周期驱动和服务注册放在同一个边界内。
+ * 对外仍只暴露 `IModuleManager` 的模块级能力；服务发现由 `Context` 转发到内部
+ * `ServiceRegistry`，避免调用方把“模块类型”和“业务能力”混为一谈。
+ */
 class MC_FRAMEWORK_API ModuleManager final
     : public IModuleManager,
       private foundation::base::NonCopyable {
@@ -47,13 +54,17 @@ private:
     typedef foundation::plugin::PluginLoader<IModule> ModuleLoader;
     typedef ModuleLoader::PluginHandle ModuleHandle;
 
+    // 打开插件库并创建模块实例。返回的句柄同时负责实例与动态库生命周期。
     foundation::base::Result<ModuleHandle> CreateModuleHandle(
         const std::string& normalized_library_path);
+    // IModuleManager::Module<T>() 的非模板查找入口。
     foundation::base::Result<IModule*> LookupModuleRaw(
         const std::string& name) override;
+    // 根据模块实现继承的已知服务接口，把实例登记为对应能力的提供者。
     void RegisterKnownServices(
         const std::string& name,
         IModule* module);
+    // 成功装载后的唯一提交点，保证模块表、顺序表和服务注册同步更新。
     void StoreLoadedModule(
         const std::string& name,
         ModuleHandle module);

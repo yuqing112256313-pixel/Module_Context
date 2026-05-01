@@ -1,6 +1,6 @@
 param(
     [string]$QtDir = $env:QT597_MSVC2015_64_DIR,
-    [bool]$RequireVS2015 = $true,
+    [switch]$RequireVS2015,
     [switch]$RequireQt,
     [switch]$RequireNinja
 )

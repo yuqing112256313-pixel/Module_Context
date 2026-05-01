@@ -48,7 +48,7 @@ setx QT597_MSVC2015_64_DIR "D:\path\to\Qt\5.9.7\msvc2015_64"
 Run the environment check on ECS:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\work\Module_Context\scripts\ecs\Test-WindowsBuildEnv.ps1
+powershell -ExecutionPolicy Bypass -File C:\work\Module_Context\scripts\ecs\Test-WindowsBuildEnv.ps1 -RequireVS2015
 ```
 
 Clone or update the ECS checkout and run validation:

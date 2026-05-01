@@ -31,9 +31,13 @@ Bootstrap or refresh the Windows tool layer from macOS:
 ```
 
 Large installers should be downloaded on macOS and copied with `scp` whenever
-possible. Cloud hosts can access GitHub, but direct release-asset downloads can
-be very slow. `bootstrap-ecs-from-mac.sh` auto-detects the macOS Wi-Fi HTTP
-proxy or uses `LOCAL_HTTP_PROXY`, `HTTPS_PROXY`, or `HTTP_PROXY` if set.
+possible only when the installer already lives on macOS. `win-home` has good
+network and a local HTTP proxy at `http://127.0.0.1:7897`; for new downloads on
+that PC, prefer remote `curl.exe --proxy http://127.0.0.1:7897 -L --fail ...`
+directly into `H:\Installers`. Cloud hosts can access GitHub, but direct
+release-asset downloads can be very slow. `bootstrap-ecs-from-mac.sh`
+auto-detects the macOS Wi-Fi HTTP proxy or uses `LOCAL_HTTP_PROXY`,
+`HTTPS_PROXY`, or `HTTP_PROXY` if set.
 
 For multi-GB installer uploads to Windows OpenSSH, prefer legacy scp mode:
 
@@ -54,6 +58,32 @@ osascript -e 'tell application "Finder" to duplicate POSIX file "/Users/zhangsit
 ```
 
 Keep `_offline_installers/` ignored by Git.
+
+When running ad hoc PowerShell on Windows, avoid putting Chinese text or complex
+PowerShell snippets directly in the SSH command line or in Windows PowerShell 5
+stdin. It can corrupt Unicode before PowerShell 7 sees it, and cmd built-in
+errors may still print through a legacy code page. Put the script in a UTF-8
+`.ps1` file and execute it with PowerShell 7:
+
+```sh
+./scripts/ecs/run-remote-pwsh.sh local-script.ps1
+```
+
+For scripts read from stdin:
+
+```sh
+cat local-script.ps1 | ./scripts/ecs/run-remote-pwsh.sh
+```
+
+Inside remote scripts, use:
+
+```powershell
+$PSStyle.OutputRendering = 'PlainText'
+$utf8 = [Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = $utf8
+[Console]::OutputEncoding = $utf8
+$OutputEncoding = $utf8
+```
 
 ## Windows Toolchain Targets
 
@@ -168,6 +198,16 @@ Verification files:
 
 - `bin\qmake.exe`
 - `lib\cmake\Qt5\Qt5Config.cmake`
+
+Debugger note:
+
+- Qt Creator can build with the VS2015 compiler even if the debugger list is
+  empty.
+- Debugging from Qt Creator needs CDB from Windows SDK Debugging Tools, usually
+  under `C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe` or the
+  Windows Kits 8.1 equivalent.
+- If CDB is missing, install Windows SDK Debugging Tools; this is not required
+  for the CMake/MSBuild validation loop.
 
 ## Build Notes
 

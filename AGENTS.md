@@ -154,6 +154,11 @@ Encoding rules:
 - Launch remote commands through `cmd /d /c "chcp 65001 >NUL && pwsh ..."` when
   writing ad hoc SSH commands that may print Chinese.
 - Keep Git configured with `core.quotepath=false` and UTF-8 log/commit output.
+- The installed VS2015 compiler is MSVC 19.00.23026 and does not understand
+  `/utf-8`, `/source-charset:utf-8`, or `/execution-charset:utf-8`. For any
+  `.cpp` or `.h` file that contains non-ASCII string literals, keep the file as
+  UTF-8 with BOM so VS2015 reads Chinese UI/log text correctly. Comments-only
+  files do not need this, but string-literal files do.
 - Do not enable the system-wide Windows "Beta: UTF-8" locale switch unless a
   specific tool requires it; VS2015-era tools are safer with command-scoped UTF-8.
 
@@ -212,6 +217,9 @@ Debugger note:
 ## Build Notes
 
 - Keep C++ changes compatible with C++11 and MSVC 14.0.
+- For VS2015 builds, `CMakeLists.txt` suppresses C4819 instead of passing the
+  unsupported `/utf-8` flag. Do not re-add `/utf-8` unless the compiler is
+  upgraded to a VS2017-era toolset or newer.
 - Prefer CMake presets over ad hoc command lines.
 - Keep Windows-specific validation scripts under `scripts/ecs/`.
 - Do not assume macOS can validate MSVC or Qt 5.9.7 behavior.

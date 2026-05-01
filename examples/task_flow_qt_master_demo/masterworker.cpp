@@ -1,4 +1,4 @@
-#include "masterworker.h"
+﻿#include "masterworker.h"
 
 #include "bmpframesource.h"
 #include "rabbitmqadminclient.h"

@@ -1,4 +1,4 @@
-#include "rabbitmqadminclient.h"
+﻿#include "rabbitmqadminclient.h"
 
 #include <QtCore/QEventLoop>
 #include <QtCore/QElapsedTimer>

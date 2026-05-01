@@ -57,10 +57,15 @@ if (Test-Path $envCheck) {
     $requireVs2015 = $Preset -match "vs2015"
     $requireQt = $Preset -match "qt"
     $requireNinja = $Preset -match "ninja|mingw|llvm"
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $envCheck `
-        -RequireVS2015:$requireVs2015 `
-        -RequireQt:$requireQt `
-        -RequireNinja:$requireNinja
+    $envCheckArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $envCheck
+    )
+    if ($requireVs2015) { $envCheckArgs += "-RequireVS2015" }
+    if ($requireQt) { $envCheckArgs += "-RequireQt" }
+    if ($requireNinja) { $envCheckArgs += "-RequireNinja" }
+    & powershell @envCheckArgs
     $envExit = $LASTEXITCODE
     if ($envExit -ne 0) {
         Write-Host "Environment is incomplete; checkout was updated but build is skipped."

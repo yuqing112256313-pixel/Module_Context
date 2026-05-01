@@ -146,5 +146,5 @@ Write-Host "Expected setup:"
 Write-Host " - Install Git for Windows or run scripts\ecs\Install-GitForWindows.ps1."
 Write-Host " - Install CMake 3.23+ and make cmake.exe available on PATH."
 Write-Host " - Install VS2015 C++ x64 tools, including vcvarsall.bat."
-Write-Host " - Install Qt 5.9.7 msvc2015_64 and set QT597_MSVC2015_64_DIR if not under C:\Qt."
+Write-Host " - Install Qt 5.9.7 msvc2015_64 and set QT597_MSVC2015_64_DIR if not under H:\Qt or C:\Qt."
 exit 2

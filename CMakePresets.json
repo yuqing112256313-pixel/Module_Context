@@ -1,0 +1,146 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 23,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "windows-llvm-mingw-debug",
+      "displayName": "Windows LLVM-MinGW Debug",
+      "description": "Build with the portable LLVM-MinGW, CMake, and Ninja toolchain under C:/toolchains/portable.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-llvm-mingw-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "C:/toolchains/portable/llvm-mingw-20260421-ucrt-x86_64/bin/clang.exe",
+        "CMAKE_CXX_COMPILER": "C:/toolchains/portable/llvm-mingw-20260421-ucrt-x86_64/bin/clang++.exe",
+        "CMAKE_MAKE_PROGRAM": "C:/toolchains/portable/ninja-1.13.2/ninja.exe",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "MC_FOUNDATION_SOURCE_DIR": "${sourceDir}/third_party/Foundation",
+        "MC_AMQP_CPP_SOURCE_DIR": "${sourceDir}/third_party/AMQP-CPP-CXX11",
+        "MC_CPP_HTTPLIB_SOURCE_DIR": "${sourceDir}/third_party/cpp-httplib"
+      },
+      "environment": {
+        "PATH": "C:/toolchains/portable/llvm-mingw-20260421-ucrt-x86_64/bin;C:/toolchains/portable/ninja-1.13.2;C:/toolchains/portable/cmake-4.3.2-windows-x86_64/bin;$penv{PATH}"
+      }
+    },
+    {
+      "name": "windows-llvm-mingw-release",
+      "displayName": "Windows LLVM-MinGW Release",
+      "inherits": "windows-llvm-mingw-debug",
+      "binaryDir": "${sourceDir}/build/windows-llvm-mingw-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows-vs2015-x64",
+      "displayName": "Windows VS2015 x64",
+      "description": "Build with Visual Studio 2015 / MSVC 14.0 x64 on the remote Windows ECS host.",
+      "generator": "Visual Studio 14 2015",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/windows-vs2015-x64",
+      "cacheVariables": {
+        "MC_FOUNDATION_SOURCE_DIR": "${sourceDir}/third_party/Foundation",
+        "MC_AMQP_CPP_SOURCE_DIR": "${sourceDir}/third_party/AMQP-CPP-CXX11",
+        "MC_CPP_HTTPLIB_SOURCE_DIR": "${sourceDir}/third_party/cpp-httplib",
+        "MC_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "windows-vs2015-x64-debug",
+      "displayName": "Windows VS2015 x64 Debug",
+      "inherits": "windows-vs2015-x64"
+    },
+    {
+      "name": "windows-vs2015-x64-release",
+      "displayName": "Windows VS2015 x64 Release",
+      "inherits": "windows-vs2015-x64"
+    },
+    {
+      "name": "windows-vs2015-x64-qt597",
+      "displayName": "Windows VS2015 x64 + Qt 5.9.7",
+      "description": "Build the Qt 5.9.7 msvc2015_64 task-flow desktop demo on the remote Windows ECS host.",
+      "inherits": "windows-vs2015-x64",
+      "binaryDir": "${sourceDir}/build/windows-vs2015-x64-qt597",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{QT597_MSVC2015_64_DIR};C:/Qt/Qt5.9.7/5.9.7/msvc2015_64;C:/Qt/5.9.7/msvc2015_64",
+        "MC_BUILD_TASK_FLOW_E2E": "ON",
+        "MC_BUILD_TASK_FLOW_QT_DEMO": "ON"
+      }
+    },
+    {
+      "name": "windows-vs2015-x64-qt597-debug",
+      "displayName": "Windows VS2015 x64 Qt 5.9.7 Debug",
+      "inherits": "windows-vs2015-x64-qt597"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-llvm-mingw-debug",
+      "displayName": "Build Windows LLVM-MinGW Debug",
+      "configurePreset": "windows-llvm-mingw-debug"
+    },
+    {
+      "name": "windows-llvm-mingw-release",
+      "displayName": "Build Windows LLVM-MinGW Release",
+      "configurePreset": "windows-llvm-mingw-release"
+    },
+    {
+      "name": "windows-vs2015-x64-debug",
+      "displayName": "Build Windows VS2015 x64 Debug",
+      "configurePreset": "windows-vs2015-x64",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-vs2015-x64-release",
+      "displayName": "Build Windows VS2015 x64 Release",
+      "configurePreset": "windows-vs2015-x64",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-vs2015-x64-qt597-debug",
+      "displayName": "Build Windows VS2015 x64 Qt 5.9.7 Debug",
+      "configurePreset": "windows-vs2015-x64-qt597",
+      "configuration": "Debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-llvm-mingw-debug",
+      "displayName": "Test Windows LLVM-MinGW Debug",
+      "configurePreset": "windows-llvm-mingw-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-llvm-mingw-release",
+      "displayName": "Test Windows LLVM-MinGW Release",
+      "configurePreset": "windows-llvm-mingw-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-vs2015-x64-debug",
+      "displayName": "Test Windows VS2015 x64 Debug",
+      "configurePreset": "windows-vs2015-x64",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-vs2015-x64-qt597-debug",
+      "displayName": "Test Windows VS2015 x64 Qt 5.9.7 Debug",
+      "configurePreset": "windows-vs2015-x64-qt597",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

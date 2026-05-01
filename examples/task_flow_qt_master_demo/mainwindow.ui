@@ -1,0 +1,1431 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1920</width>
+    <height>1080</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Task Flow E2E 主机演示台</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+*{font-family:&quot;Microsoft YaHei&quot;,&quot;SimSun&quot;;font-size:13px;color:#303133;}
+QMainWindow#MainWindow,QWidget#centralWidget,QWidget#MainContentWidget,#BottomStatusBar{background:#F5F7FA;}
+QWidget#TopStatusBar,#CenterPanelWidget,#LeftPanelWidget,#RightPanelWidget,#RabbitMQWidget,#AlgorithmSummaryWidget_2{background:#FFFFFF;border-bottom:1px solid #DCDFE6;border:1px solid #DCDFE6;border-radius:4px;}
+QLabel#RunStateLabel{border-radius:4px;font-weight:bold;padding:2px 8px;}
+QLabel#RunStateLabel[runState=&quot;running&quot;]{background:#E8F6EC;color:#1B8A3D;border:1px solid #B7E1C0;}
+QLabel#RunStateLabel[runState=&quot;stopped&quot;]{background:#F5F7FA;color:#606266;border:1px solid #DCDFE6;}
+QLabel#RunStateLabel[runState=&quot;error&quot;]{background:#FDECEC;color:#D93026;border:1px solid #F5B5B5;}
+QLabel#RunIdTitleLabel,QLabel#RunIdValueLabel,QLabel#RabbitMqTitleLabel,QLabel#RabbitMqStateLabel,QLabel#SharedDirTitleLabel,QLabel#SharedDirStateLabel{background:transparent;border:none;color:#303133;}
+QLabel#RabbitMqDotLabel[connState=&quot;connected&quot;],QLabel#SharedDirDotLabel[dirState=&quot;normal&quot;]{background:#18A058;border-radius:4px;min-width:8px;max-width:8px;min-height:8px;max-height:8px;}
+QLabel#RabbitMqDotLabel[connState=&quot;disconnected&quot;],QLabel#SharedDirDotLabel[dirState=&quot;error&quot;]{background:#D93026;border-radius:4px;min-width:8px;max-width:8px;min-height:8px;max-height:8px;}
+QFrame[topLine=&quot;true&quot;]{background:#DCDFE6;border:none;min-width:1px;max-width:1px;}
+QWidget#LeftPanelWidget,QWidget#CenterPanelWidget,QWidget#RightPanelWidget,QWidget#TraceLogPanelWidget{background:#FFFFFF;border:1px solid #DCDFE6;border-radius:4px;}
+QLabel[titleRole=&quot;panelTitle&quot;]{font-size:14px;font-weight:bold;background:transparent;padding:4px 0px;}
+QLabel[titleRole=&quot;subTitle&quot;]{font-size:13px;font-weight:bold;background:transparent;padding:2px 0px;}
+QFrame#PanelHLine{background:#E4E7ED;border:none;min-height:1px;max-height:1px;}
+QPushButton{background:#F8F9FB;color:#303133;border:1px solid #DCDFE6;border-radius:4px;min-height:30px;padding:4px 10px;}
+QPushButton:hover{background:#F0F6FF;border:1px solid #A8CFFF;color:#1E6BB8;}
+QPushButton:pressed{background:#E3F0FF;border:1px solid #7DB8F5;}
+QPushButton#SelectImageDirButton,QPushButton#StartCaptureButton,QPushButton#StopButton,QPushButton#ClearSharedDirButton{min-height:34px;}
+QPushButton#SelectSharedDirButton{min-width:28px;max-width:28px;min-height:26px;max-height:26px;padding:0px;}
+QPushButton#ClearLogButton{min-width:70px;max-height:24px;font-size:12px;padding:1px 8px;}
+QLineEdit{background:#FFFFFF;color:#303133;border:1px solid #C9CDD4;border-radius:4px;min-height:26px;padding:2px 6px;selection-background-color:#409EFF;selection-color:#FFFFFF;}
+QLineEdit:focus{border:1px solid #409EFF;}
+QLabel#LocalImageDirValueLabel,QLabel[queueRole=&quot;metricValue&quot;],QLabel#DefectCountValueLabel,QLabel#AlgorithmMsValueLabel,QLabel#WorkerIdValueLabel{color:#1E6BB8;}
+QLabel#UnitLabel{color:#606266;}
+QLabel#PreviewImageLabel,QLabel#ResultImageLabel{background:#F0F2F5;border:1px solid #C9CDD4;border-radius:2px;color:#909399;}
+QWidget#ImageInfoWidget{background:#FFFFFF;border:1px solid #DCDCDC;}
+QLabel[infoRole=&quot;name&quot;]{background:#FFFFFF;color:#606266;border-right:1px solid #DCDCDC;border-bottom:1px solid #DCDCDC;padding-left:14px;}
+QLabel[infoRole=&quot;value&quot;]{background:#FFFFFF;color:#303133;border-bottom:1px solid #DCDCDC;padding-left:22px;}
+QTableWidget{background:#FFFFFF;alternate-background-color:#FAFAFA;border:1px solid #DCDFE6;gridline-color:#E4E7ED;selection-background-color:#EAF4FF;selection-color:#1E6BB8;outline:none;}
+QTableWidget::item{padding:4px;border:none;}
+QHeaderView::section{background:#F5F7FA;color:#303133;border:none;border-right:1px solid #DCDFE6;border-bottom:1px solid #DCDFE6;padding:4px;font-weight:bold;}
+QWidget[queueCard=&quot;true&quot;]{background:#FFFFFF;border:1px solid #DCDFE6;border-radius:4px;}
+QLabel[queueRole=&quot;name&quot;]{font-weight:bold;font-size:13px;}
+QLabel[queueRole=&quot;metricName&quot;]{color:#606266;font-size:12px;}
+QLabel[queueRole=&quot;metricValue&quot;]{font-weight:bold;font-size:14px;}
+QFrame[queueRole=&quot;vline&quot;]{background:#E4E7ED;border:none;min-width:1px;max-width:1px;}
+QLabel#InspectionResultValueLabel[resultState=&quot;NG&quot;]{color:#D93026;font-weight:bold;}
+QLabel#InspectionResultValueLabel[resultState=&quot;OK&quot;]{color:#18A058;font-weight:bold;}
+QWidget#BottomStatusBar{background:#FFFFFF;border-top:1px solid #DCDFE6;}
+QLabel[bottomRole=&quot;status&quot;]{color:#606266;font-size:12px;}
+QScrollBar:vertical{background:#F5F7FA;width:12px;margin:0px;border:none;}QScrollBar::handle:vertical{background:#C0C4CC;border-radius:5px;min-height:30px;margin:2px;}QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0px;background:none;border:none;}
+QWidget#BottomStatusBar{background:#F5F7FA;}</string>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="verticalLayout_3">
+    <property name="spacing">
+     <number>1</number>
+    </property>
+    <property name="leftMargin">
+     <number>1</number>
+    </property>
+    <property name="topMargin">
+     <number>1</number>
+    </property>
+    <property name="rightMargin">
+     <number>1</number>
+    </property>
+    <property name="bottomMargin">
+     <number>1</number>
+    </property>
+    <item>
+     <widget class="QWidget" name="TopStatusBar" native="true">
+      <layout class="QHBoxLayout" name="TopStatusLayout">
+       <property name="spacing">
+        <number>12</number>
+       </property>
+       <property name="leftMargin">
+        <number>10</number>
+       </property>
+       <property name="topMargin">
+        <number>4</number>
+       </property>
+       <property name="rightMargin">
+        <number>10</number>
+       </property>
+       <property name="bottomMargin">
+        <number>4</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="RunStateLabel">
+         <property name="minimumSize">
+          <size>
+           <width>62</width>
+           <height>22</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>74</width>
+           <height>22</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>运行中</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+         <property name="runState" stdset="0">
+          <string>running</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="TopVLine_1">
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <property name="topLine" stdset="0">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="RunIdTitleLabel">
+         <property name="text">
+          <string>run_id:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="RunIdValueLabel">
+         <property name="text">
+          <string>RUN_20260427_001</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="TopVLine_2">
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <property name="topLine" stdset="0">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="RabbitMqTitleLabel">
+         <property name="text">
+          <string>RabbitMQ:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="RabbitMqDotLabel">
+         <property name="minimumSize">
+          <size>
+           <width>8</width>
+           <height>8</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>8</width>
+           <height>8</height>
+          </size>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="connState" stdset="0">
+          <string>connected</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="RabbitMqStateLabel">
+         <property name="text">
+          <string>已连接</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="TopVLine_3">
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <property name="topLine" stdset="0">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="SharedDirTitleLabel">
+         <property name="text">
+          <string>共享目录:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="SharedDirDotLabel">
+         <property name="minimumSize">
+          <size>
+           <width>8</width>
+           <height>8</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>8</width>
+           <height>8</height>
+          </size>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="dirState" stdset="0">
+          <string>normal</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="SharedDirStateLabel">
+         <property name="text">
+          <string>正常</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="TopStatusSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <property name="spacing">
+       <number>2</number>
+      </property>
+      <item>
+       <widget class="QWidget" name="LeftPanelWidget" native="true">
+        <property name="maximumSize">
+         <size>
+          <width>400</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <layout class="QVBoxLayout" name="LeftPanelLayout">
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <property name="leftMargin">
+          <number>10</number>
+         </property>
+         <property name="topMargin">
+          <number>8</number>
+         </property>
+         <property name="rightMargin">
+          <number>10</number>
+         </property>
+         <property name="bottomMargin">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="ControlTitleLabel">
+           <property name="styleSheet">
+            <string notr="true">border-bottom:1px solid #DCDFE6;</string>
+           </property>
+           <property name="text">
+            <string>E2E 主机控制</string>
+           </property>
+           <property name="titleRole" stdset="0">
+            <string>panelTitle</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="SelectImageDirButton">
+           <property name="text">
+            <string>▣  选择本地图像目录</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="StartCaptureButton">
+           <property name="text">
+            <string>启动 E2E</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="StopButton">
+           <property name="text">
+            <string>停止本轮</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="ClearSharedDirButton">
+           <property name="text">
+            <string>清理运行目录</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="PanelHLine">
+           <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="ParamConfigTitleLabel">
+           <property name="text">
+            <string>调度与数据面参数</string>
+           </property>
+           <property name="titleRole" stdset="0">
+            <string>subTitle</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="ExpectedWorkerCountLabel">
+           <property name="text">
+            <string>从机数量</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="ExpectedWorkerCountEdit">
+           <property name="text">
+            <string>5</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="PublishRateLabel">
+           <property name="text">
+            <string>发布速率</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="PublishRateLayout">
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLineEdit" name="PublishRateEdit">
+             <property name="text">
+              <string>50</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="UnitLabel">
+             <property name="text">
+              <string>img/s</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QLabel" name="SharedImageRootLabel">
+           <property name="text">
+            <string>运行输出目录</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="SharedImageRootLayout">
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLineEdit" name="SharedImageRootEdit">
+             <property name="text">
+              <string>runtime\master</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="SelectSharedDirButton">
+             <property name="text">
+              <string>▣</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QLabel" name="TaskCountLabel">
+           <property name="text">
+            <string>任务数量</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="TaskCountEdit">
+           <property name="text">
+            <string>100</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="RabbitMqApiLabel">
+           <property name="text">
+            <string>RabbitMQ 管理 API</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="RabbitMqApiEdit">
+           <property name="text">
+            <string>http://127.0.0.1:15672/api</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="RabbitMqHostLabel">
+           <property name="text">
+            <string>RabbitMQ AMQP 主机</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="RabbitMqHostEdit">
+           <property name="text">
+            <string>10.18.18.101</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="HttpPortLabel">
+           <property name="text">
+            <string>主机 HTTP 端口</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="HttpPortEdit">
+           <property name="text">
+            <string>50080</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="PluginDirectoryLabel">
+           <property name="text">
+            <string>插件 DLL 目录</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="PluginDirectoryLayout">
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLineEdit" name="PluginDirectoryEdit">
+             <property name="text">
+              <string>.</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="SelectPluginDirButton">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="LocalImageDirLayout">
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="LocalImageDirTitleLabel">
+             <property name="text">
+              <string>本地图像目录:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="LocalImageDirValueLabel">
+             <property name="text">
+              <string>未选择</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QWidget" name="CenterPanelWidget" native="true">
+        <layout class="QVBoxLayout" name="CenterPanelLayout">
+         <property name="spacing">
+          <number>6</number>
+         </property>
+         <property name="leftMargin">
+          <number>10</number>
+         </property>
+         <property name="topMargin">
+          <number>8</number>
+         </property>
+         <property name="rightMargin">
+          <number>10</number>
+         </property>
+         <property name="bottomMargin">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="TaskFlowTitleLabel">
+           <property name="styleSheet">
+            <string notr="true">border-bottom:1px solid #DCDFE6;</string>
+           </property>
+           <property name="text">
+            <string>真图采集与任务链路</string>
+           </property>
+           <property name="titleRole" stdset="0">
+            <string>panelTitle</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="PreviewTitleLabel">
+           <property name="text">
+            <string>当前 BMP 预览</string>
+           </property>
+           <property name="titleRole" stdset="0">
+            <string>subTitle</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="PreviewInfoLayout">
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <item>
+            <widget class="QGraphicsView" name="graphicsView"/>
+           </item>
+           <item>
+            <widget class="QWidget" name="ImageInfoGridWidget" native="true">
+             <property name="styleSheet">
+              <string notr="true">#ImageInfoGridWidget{border:1px solid #DCDFE6;border-radius:4px;}</string>
+             </property>
+             <layout class="QGridLayout" name="ImageInfoGridLayout">
+              <property name="leftMargin">
+               <number>2</number>
+              </property>
+              <property name="topMargin">
+               <number>2</number>
+              </property>
+              <property name="rightMargin">
+               <number>2</number>
+              </property>
+              <property name="bottomMargin">
+               <number>2</number>
+              </property>
+              <property name="spacing">
+               <number>0</number>
+              </property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="TraceIdNameLabel">
+                <property name="minimumSize">
+                 <size>
+                  <width>110</width>
+                  <height>45</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>当前任务:</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                </property>
+                <property name="infoRole" stdset="0">
+                 <string>name</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QLabel" name="TraceIdValueLabel">
+                <property name="text">
+                 <string>未启动</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                </property>
+                <property name="infoRole" stdset="0">
+                 <string>value</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="ImagePathNameLabel">
+                <property name="minimumSize">
+                 <size>
+                  <width>110</width>
+                  <height>55</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>BMP 路径:</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                </property>
+                <property name="infoRole" stdset="0">
+                 <string>name</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QLabel" name="ImagePathValueLabel">
+                <property name="text">
+                 <string>未选择</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="infoRole" stdset="0">
+                 <string>value</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="ImageFormatNameLabel">
+                <property name="minimumSize">
+                 <size>
+                  <width>110</width>
+                  <height>45</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>BMP 文件:</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                </property>
+                <property name="infoRole" stdset="0">
+                 <string>name</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QLabel" name="ImageFormatValueLabel">
+                <property name="text">
+                 <string>-</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                </property>
+                <property name="infoRole" stdset="0">
+                 <string>value</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="ImageBytesNameLabel">
+                <property name="minimumSize">
+                 <size>
+                  <width>110</width>
+                  <height>45</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>图片大小:</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                </property>
+                <property name="infoRole" stdset="0">
+                 <string>name</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QLabel" name="ImageBytesValueLabel">
+                <property name="text">
+                 <string>-</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                </property>
+                <property name="infoRole" stdset="0">
+                 <string>value</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QLabel" name="TaskTableTitleLabel">
+           <property name="styleSheet">
+            <string notr="true">border-top:1px solid #DCDFE6;</string>
+           </property>
+           <property name="text">
+            <string>任务流状态</string>
+           </property>
+           <property name="titleRole" stdset="0">
+            <string>subTitle</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QTableWidget" name="TaskStateTable">
+           <property name="editTriggers">
+            <set>QAbstractItemView::NoEditTriggers</set>
+           </property>
+           <property name="selectionMode">
+            <enum>QAbstractItemView::SingleSelection</enum>
+           </property>
+           <property name="selectionBehavior">
+            <enum>QAbstractItemView::SelectRows</enum>
+           </property>
+           <property name="rowCount">
+            <number>0</number>
+           </property>
+           <property name="columnCount">
+            <number>8</number>
+           </property>
+           <attribute name="horizontalHeaderStretchLastSection">
+            <bool>true</bool>
+           </attribute>
+           <attribute name="verticalHeaderVisible">
+            <bool>false</bool>
+           </attribute>
+           <column>
+            <property name="text">
+             <string>序号</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>BMP 图</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>TaskMessage</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>任务状态</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>处理从机</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>HTTP 拉图</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>收图片正文</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>全链路</string>
+            </property>
+           </column>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <property name="spacing">
+         <number>2</number>
+        </property>
+        <item>
+         <widget class="QWidget" name="RabbitMQWidget" native="true">
+          <layout class="QVBoxLayout" name="verticalLayout_2">
+           <item>
+            <widget class="QLabel" name="RabbitMqTitleMainLabel">
+             <property name="styleSheet">
+              <string notr="true">border-bottom:1px solid #DCDFE6;</string>
+             </property>
+             <property name="text">
+              <string>RabbitMQ 调度状态</string>
+             </property>
+             <property name="titleRole" stdset="0">
+              <string>panelTitle</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="QueueWidget_1" native="true">
+             <property name="styleSheet">
+              <string notr="true">#QueueWidget_1{border:1px solid #DCDFE6;border-radius:4px;}</string>
+             </property>
+             <layout class="QVBoxLayout" name="TaskQueueCardLayout">
+              <property name="spacing">
+               <number>2</number>
+              </property>
+              <property name="leftMargin">
+               <number>10</number>
+              </property>
+              <property name="topMargin">
+               <number>4</number>
+              </property>
+              <property name="rightMargin">
+               <number>10</number>
+              </property>
+              <property name="bottomMargin">
+               <number>4</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="TaskQueueNameLabel">
+                <property name="text">
+                 <string>mc.task.queue</string>
+                </property>
+                <property name="queueRole" stdset="0">
+                 <string>name</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="TaskQueueMetricLayout">
+                <item>
+                 <layout class="QVBoxLayout" name="_2">
+                  <item>
+                   <widget class="QLabel" name="TaskReadyNameLabel">
+                    <property name="text">
+                     <string>待消费</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                    <property name="queueRole" stdset="0">
+                     <string>metricName</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="TaskReadyValueLabel">
+                   <property name="text">
+                     <string>0</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                    <property name="queueRole" stdset="0">
+                     <string>metricValue</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <widget class="QFrame" name="TaskQueueLine1">
+                  <property name="frameShape">
+                   <enum>QFrame::NoFrame</enum>
+                  </property>
+                  <property name="queueRole" stdset="0">
+                   <string>vline</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QVBoxLayout" name="_3">
+                  <item>
+                   <widget class="QLabel" name="TaskUnackedNameLabel">
+                   <property name="text">
+                     <string>处理中</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                    <property name="queueRole" stdset="0">
+                     <string>metricName</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="TaskUnackedValueLabel">
+                   <property name="text">
+                     <string>0</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                    <property name="queueRole" stdset="0">
+                     <string>metricValue</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <widget class="QFrame" name="TaskQueueLine2">
+                  <property name="frameShape">
+                   <enum>QFrame::NoFrame</enum>
+                  </property>
+                  <property name="queueRole" stdset="0">
+                   <string>vline</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QVBoxLayout" name="_4">
+                  <item>
+                   <widget class="QLabel" name="TaskConsumersNameLabel">
+                   <property name="text">
+                     <string>消费者</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                    <property name="queueRole" stdset="0">
+                     <string>metricName</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="TaskConsumersValueLabel">
+                   <property name="text">
+                     <string>0</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                    <property name="queueRole" stdset="0">
+                     <string>metricValue</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="QueueWidget_2" native="true">
+             <property name="styleSheet">
+              <string notr="true">#QueueWidget_2{border:1px solid #DCDFE6;border-radius:4px;}</string>
+             </property>
+             <layout class="QVBoxLayout" name="_5">
+              <property name="leftMargin">
+               <number>10</number>
+              </property>
+              <property name="topMargin">
+               <number>4</number>
+              </property>
+              <property name="rightMargin">
+               <number>10</number>
+              </property>
+              <property name="bottomMargin">
+               <number>4</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="ResultQueueNameLabel">
+                <property name="text">
+                 <string>mc.result.queue</string>
+                </property>
+                <property name="queueRole" stdset="0">
+                 <string>name</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="_6">
+                <item>
+                 <widget class="QLabel" name="ResultReadyValueLabel">
+                  <property name="text">
+                   <string>待消费 0</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                  <property name="queueRole" stdset="0">
+                   <string>metricValue</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="ResultUnackedValueLabel">
+                  <property name="text">
+                   <string>处理中 0</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                  <property name="queueRole" stdset="0">
+                   <string>metricValue</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="ResultConsumersValueLabel">
+                  <property name="text">
+                   <string>消费者 0</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                  <property name="queueRole" stdset="0">
+                   <string>metricValue</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="QueueWidget_3" native="true">
+             <property name="styleSheet">
+              <string notr="true">#QueueWidget_3{border:1px solid #DCDFE6;border-radius:4px;}</string>
+             </property>
+             <layout class="QVBoxLayout" name="_7">
+              <property name="leftMargin">
+               <number>10</number>
+              </property>
+              <property name="topMargin">
+               <number>4</number>
+              </property>
+              <property name="rightMargin">
+               <number>10</number>
+              </property>
+              <property name="bottomMargin">
+               <number>4</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="TelemetryQueueNameLabel">
+                <property name="text">
+                 <string>mc.control.exchange</string>
+                </property>
+                <property name="queueRole" stdset="0">
+                 <string>name</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="_8">
+                <item>
+                 <widget class="QLabel" name="TelemetryReadyValueLabel">
+                  <property name="text">
+                   <string>广播停止</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                  <property name="queueRole" stdset="0">
+                   <string>metricValue</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="TelemetryUnackedValueLabel">
+                  <property name="text">
+                   <string>不承载任务</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                  <property name="queueRole" stdset="0">
+                   <string>metricValue</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="TelemetryConsumersValueLabel">
+                  <property name="text">
+                   <string>fanout</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                  <property name="queueRole" stdset="0">
+                   <string>metricValue</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QWidget" name="AlgorithmSummaryWidget_2" native="true">
+          <property name="maximumSize">
+           <size>
+            <width>500</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <layout class="QVBoxLayout" name="AlgorithmSummaryWidget">
+           <item>
+            <widget class="QLabel" name="ResultTitleMainLabel">
+             <property name="styleSheet">
+              <string notr="true">border-bottom:1px solid #DCDFE6;</string>
+             </property>
+             <property name="text">
+              <string>算法结果占位</string>
+             </property>
+             <property name="titleRole" stdset="0">
+              <string>panelTitle</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QGridLayout" name="ResultInfoGridLayout">
+             <item row="0" column="0">
+              <widget class="QLabel" name="ResultNameLabel">
+               <property name="text">
+                <string>结果状态:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLabel" name="InspectionResultValueLabel">
+               <property name="text">
+                <string>待接入</string>
+               </property>
+              <property name="resultState" stdset="0">
+                <string/>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="DefectCountNameLabel">
+               <property name="text">
+                <string>缺陷数量:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QLabel" name="DefectCountValueLabel">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="AlgorithmMsNameLabel">
+               <property name="text">
+                <string>算法耗时:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QLabel" name="AlgorithmMsValueLabel">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="WorkerIdNameLabel">
+               <property name="text">
+                <string>处理从机:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QLabel" name="WorkerIdValueLabel">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="ResultJsonPathNameLabel">
+               <property name="text">
+                <string>结果文件:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QLabel" name="ResultJsonPathValueLabel">
+               <property name="text">
+                <string>本轮暂不生成算法结果文件</string>
+               </property>
+               <property name="wordWrap">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QGraphicsView" name="graphicsView_2"/>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QWidget" name="TraceLogPanelWidget" native="true">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>400</height>
+       </size>
+      </property>
+      <layout class="QVBoxLayout" name="TraceLogPanelLayout">
+       <property name="spacing">
+        <number>4</number>
+       </property>
+       <property name="leftMargin">
+        <number>8</number>
+       </property>
+       <property name="topMargin">
+        <number>4</number>
+       </property>
+       <property name="rightMargin">
+        <number>8</number>
+       </property>
+       <property name="bottomMargin">
+        <number>4</number>
+       </property>
+       <item>
+        <layout class="QHBoxLayout" name="TraceLogHeaderLayout">
+         <item>
+          <widget class="QLabel" name="TraceLogTitleLabel">
+           <property name="text">
+            <string>Trace 日志</string>
+           </property>
+           <property name="titleRole" stdset="0">
+            <string>panelTitle</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="TraceLogHeaderSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="ClearLogButton">
+           <property name="text">
+            <string>清空日志</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QTableWidget" name="TraceLogTable">
+         <property name="editTriggers">
+          <set>QAbstractItemView::NoEditTriggers</set>
+         </property>
+         <property name="selectionBehavior">
+          <enum>QAbstractItemView::SelectRows</enum>
+         </property>
+         <property name="rowCount">
+          <number>7</number>
+         </property>
+         <property name="columnCount">
+          <number>2</number>
+         </property>
+         <attribute name="horizontalHeaderStretchLastSection">
+          <bool>true</bool>
+         </attribute>
+         <attribute name="verticalHeaderVisible">
+          <bool>false</bool>
+         </attribute>
+         <row/>
+         <row/>
+         <row/>
+         <row/>
+         <row/>
+         <row/>
+         <row/>
+         <column>
+          <property name="text">
+           <string>时间</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>事件</string>
+          </property>
+         </column>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QWidget" name="BottomStatusBar" native="true">
+      <layout class="QHBoxLayout" name="BottomStatusLayout">
+       <property name="spacing">
+        <number>12</number>
+       </property>
+       <property name="leftMargin">
+        <number>12</number>
+       </property>
+       <property name="topMargin">
+        <number>2</number>
+       </property>
+       <property name="rightMargin">
+        <number>12</number>
+       </property>
+       <property name="bottomMargin">
+        <number>2</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="HostLabel">
+         <property name="text">
+          <string>本机：HOST-PC</string>
+         </property>
+         <property name="bottomRole" stdset="0">
+          <string>status</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="IpLabel">
+         <property name="text">
+          <string>IP：192.168.1.100</string>
+         </property>
+         <property name="bottomRole" stdset="0">
+          <string>status</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="BottomLeftSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="SystemTimeLabel">
+         <property name="text">
+          <string>系统时间：2026-04-27  10:15:21</string>
+         </property>
+         <property name="bottomRole" stdset="0">
+          <string>status</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="BottomRightSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="VersionLabel">
+         <property name="text">
+          <string>版本：v0.1.0-demo</string>
+         </property>
+         <property name="bottomRole" stdset="0">
+          <string>status</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,56 @@
+# Build outputs
+build/
+out/
+bin/
+lib/
+install/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+_deps/
+
+# Visual Studio / MSBuild
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
+*.ipch
+*.obj
+*.pdb
+*.idb
+*.ilk
+*.exp
+*.tlog
+*.lastbuildstate
+
+# Runtime artifacts
+*.exe
+*.dll
+*.lib
+*.so
+*.dylib
+*.app/
+*.log
+
+# Qt generated files
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+*.qmlc
+*.jsc
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp

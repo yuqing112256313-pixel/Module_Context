@@ -46,7 +46,11 @@
         "MC_FOUNDATION_SOURCE_DIR": "${sourceDir}/third_party/Foundation",
         "MC_AMQP_CPP_SOURCE_DIR": "${sourceDir}/third_party/AMQP-CPP-CXX11",
         "MC_CPP_HTTPLIB_SOURCE_DIR": "${sourceDir}/third_party/cpp-httplib",
-        "MC_BUILD_TESTS": "ON"
+        "MC_BUILD_TESTS": "ON",
+        "CMAKE_WARN_VS14": "OFF"
+      },
+      "environment": {
+        "CodeAnalysisTargets": "CodeAnalysisTargets_disabled"
       }
     },
     {

@@ -112,6 +112,10 @@ $cmake = Find-Exe "cmake.exe" @(
 Write-Host "Configuring preset: $Preset"
 Push-Location $WorkDir
 try {
+    if ($Preset -match "vs2015") {
+        $env:CodeAnalysisTargets = "CodeAnalysisTargets_disabled"
+    }
+
     Invoke-Checked $cmake @("--preset", $Preset)
 
     Write-Host "Building preset: $Preset"

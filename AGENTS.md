@@ -40,6 +40,13 @@ use the Windows proxy for Git as well, for example
 `git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 ...`.
 If a Git command prints `fatal`, treat it as a hard failure instead of
 continuing a build from a possibly stale checkout.
+After a reboot, do not assume the proxy is actually listening just because the
+machine usually has one; probe `127.0.0.1:7897` first. If a GitHub release asset
+hangs at 0 bytes without the proxy, retry with `HTTPS_PROXY=http://127.0.0.1:7897`
+on macOS or `curl.exe --proxy http://127.0.0.1:7897` on Windows. Erlang's
+official download host can be much slower than GitHub; if a single `curl`
+stream crawls, use HTTP range segments, concatenate, and verify SHA256 before
+copying to Windows.
 
 For multi-GB installer uploads to Windows OpenSSH, prefer legacy scp mode:
 
@@ -97,11 +104,15 @@ The legacy GUI validation target is:
 - Qt 5.9.7 `msvc2015_64`
 - CMake 3.23 or newer
 - Git for Windows
+- Erlang OTP for RabbitMQ-backed E2E testing
+- RabbitMQ Server with management plugin for Task Flow E2E
 
 Default expected install paths:
 
 - VS2015: `C:\Program Files (x86)\Microsoft Visual Studio 14.0`
 - Qt: prefer `H:\Qt\Qt5.9.7\5.9.7\msvc2015_64`; `C:\Qt\...` is also recognized.
+- Erlang on `win-home`: `H:\Tools\Erlang\OTP-27.3.4.3`
+- RabbitMQ on `win-home`: `H:\Tools\RabbitMQ\rabbitmq_server-4.2.5`
 - CMake: available on `PATH`
 
 If Qt is installed elsewhere, set:
@@ -114,6 +125,16 @@ On `win-home`, Qt is installed at `H:\Qt\Qt5.9.7\5.9.7\msvc2015_64`.
 Keep both `QT597_MSVC2015_64_DIR` and `QTDIR` pointed there, and keep
 `H:\Qt\Qt5.9.7\5.9.7\msvc2015_64\bin` on the user `Path` so `qmake.exe` and
 Qt runtime DLLs are visible from fresh SSH/Desktop sessions.
+
+On `win-home`, the standard RabbitMQ test broker is isolated as a manual
+Windows service:
+
+- Service name: `RabbitMQ_ModuleContext`
+- Node name: `module_context_test@localhost`
+- Base/data/logs: `H:\Codex\RabbitMQTestEnv\base`
+- Config: `H:\Codex\RabbitMQTestEnv\config\rabbitmq.conf`
+- AMQP: `127.0.0.1:5672`
+- Management API: `http://127.0.0.1:15672/api`
 
 ## Windows Host Commands
 
@@ -141,6 +162,26 @@ pwsh -ExecutionPolicy Bypass -File H:\Codex\Module_Context\scripts\ecs\Sync-Buil
   -WorkDir H:\Codex\Module_Context `
   -Branch main `
   -Preset windows-vs2015-x64-qt597-debug
+```
+
+Start or verify the isolated local RabbitMQ broker before running Task Flow E2E:
+
+```powershell
+pwsh -ExecutionPolicy Bypass -File H:\Codex\Module_Context\scripts\ecs\Start-RabbitMqTestEnv.ps1
+```
+
+Run the single-machine RabbitMQ Task Flow E2E directly:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File H:\Codex\Module_Context\examples\task_flow\run_task_flow_e2e.ps1 `
+  -BuildDir H:\Codex\Module_Context\build\windows-vs2015-x64-qt597 `
+  -Configuration Debug
+```
+
+Or run it through CTest:
+
+```powershell
+ctest --preset windows-vs2015-x64-qt597-debug -R mc_rabbitmq_task_flow_e2e --output-on-failure
 ```
 
 ## Installation Notes
@@ -240,6 +281,21 @@ Debugger note:
   E2E test needs both Management API `15672` and AMQP `5672`. If those ports are
   unavailable, the E2E test should skip or fail explicitly, not appear green by
   accident.
+- Do not start RabbitMQ for E2E with `rabbitmq-server.bat -detached` from an
+  SSH session and expect it to survive after SSH exits. Windows OpenSSH can tear
+  down child processes with the session. Use the manual
+  `RabbitMQ_ModuleContext` Windows service instead.
+- The RabbitMQ service runs outside the SSH user session, so
+  `rabbitmq-diagnostics` or `rabbitmqctl` from the SSH user can fail Erlang
+  cookie authentication even while the broker is healthy. For this project's
+  E2E gate, verify TCP `127.0.0.1:5672` and Management API
+  `http://127.0.0.1:15672/api/overview` with `guest:guest`.
+- Windows PowerShell child processes launched by CTest can have a different
+  module autoload environment than an interactive shell. Avoid making test
+  scripts depend solely on cmdlets such as `Get-FileHash`; use a .NET fallback
+  for SHA256 when the cmdlet is unavailable.
+- PowerShell variable names are case-insensitive; avoid `$home` as a local
+  variable because it collides with the built-in read-only `$HOME`.
 - Prefer CMake presets over ad hoc command lines.
 - Keep Windows-specific validation scripts under `scripts/ecs/`.
 - Do not assume macOS can validate MSVC or Qt 5.9.7 behavior.

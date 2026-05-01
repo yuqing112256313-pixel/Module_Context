@@ -54,6 +54,28 @@ function Get-SettingValue {
     return $FallbackValue
 }
 
+function Get-FileSha256 {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (Get-Command Get-FileHash -ErrorAction SilentlyContinue) {
+        return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash
+    }
+
+    $resolvedPath = (Resolve-Path -LiteralPath $Path).Path
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead($resolvedPath)
+    try {
+        $hashBytes = $sha256.ComputeHash($stream)
+        return (($hashBytes | ForEach-Object { $_.ToString('X2') }) -join '')
+    } finally {
+        $stream.Dispose()
+        $sha256.Dispose()
+    }
+}
+
 function Resolve-ExampleArtifact {
     param(
         [string]$ExamplesDir,
@@ -483,11 +505,11 @@ try {
     Write-Host "[worker] HTTP endpoint: $HttpEndpoint$HttpRoute"
     Write-Host "[worker] HTTP chunk bytes: $HttpChunkBytes"
     Write-Host "[worker] rabbitmq_bus.dll: $rabbitPluginDll"
-    Write-Host "[worker] rabbitmq_bus.dll sha256: $((Get-FileHash -Algorithm SHA256 -LiteralPath $rabbitPluginDll).Hash)"
+    Write-Host "[worker] rabbitmq_bus.dll sha256: $(Get-FileSha256 -Path $rabbitPluginDll)"
     if ($UseAlgorithmPlugin) {
         Write-Host "[worker] semiplugin_manager.dll: $SemipluginManagerPath"
         Write-Host "[worker] algorithm plugin: $AlgorithmPluginName -> $AlgorithmPluginPath"
-        Write-Host "[worker] algorithm plugin sha256: $((Get-FileHash -Algorithm SHA256 -LiteralPath $AlgorithmPluginPath).Hash)"
+        Write-Host "[worker] algorithm plugin sha256: $(Get-FileSha256 -Path $AlgorithmPluginPath)"
         Write-Host "[worker] algorithm input persist: $AlgorithmPersistInputImages"
     } else {
         Write-Host '[worker] algorithm plugin disabled'

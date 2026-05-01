@@ -53,7 +53,7 @@ Qt demo 构建后会把 `mc_task_flow_worker_host.exe`、`rabbitmq_bus.dll`、
 在不能打开远程桌面的环境里，可以让程序自己渲染主窗口并保存 PNG：
 
 ```powershell
-.\mc_task_flow_qt_master_demod.exe --screenshot H:\Codex\Screenshots\qt-master-demo.png
+.\mc_task_flow_qt_master_demod.exe --screenshot H:\Codex\Screenshots\qt-master-demo.png --screenshot-size 1920x1080
 ```
 
 这个模式使用默认 Windows Qt 平台即可，不需要 Windows App / RDP 会话。

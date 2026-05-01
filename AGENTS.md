@@ -77,7 +77,7 @@ For visual checks, prefer an app-owned screenshot path:
 
 ```powershell
 $exe = 'H:\Codex\Module_Context\build\windows-vs2015-x64-qt597\examples\task_flow_qt_master_demo\Debug\mc_task_flow_qt_master_demod.exe'
-& $exe --screenshot H:\Codex\Screenshots\qt-master-demo.png
+& $exe --screenshot H:\Codex\Screenshots\qt-master-demo.png --screenshot-size 1920x1080
 ```
 
 Then pull the image to macOS:
@@ -90,9 +90,11 @@ scp -O win-home:'H:/Codex/Screenshots/qt-master-demo.png' _remote_screenshots/
 This validates rendering and Chinese text without opening an interactive remote
 desktop. Let Qt use the default Windows platform plugin for this screenshot.
 Forcing `QT_QPA_PLATFORM=offscreen` on Qt 5.9.7 produced a misleading image
-with control outlines but no text. If a truly interactive desktop session is
-required, ask the user before using it and keep SSH validation paused until
-that session is closed.
+with control outlines but no text. Showing a top-level window before capture
+can also let the SSH session's virtual desktop clamp the image to roughly
+1024px wide; render with the app screenshot path at a fixed size instead. If a
+truly interactive desktop session is required, ask the user before using it and
+keep SSH validation paused until that session is closed.
 
 ## Encoding Rules
 
@@ -176,8 +178,17 @@ git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 fet
 ```
 
 After a reboot, user-session proxy software may not be running because no one
-opened the Windows desktop. If `7897` is not listening and direct GitHub access
-fails, use an SSH-transferred Git bundle as the validation fallback:
+opened the Windows desktop. Clash Verge can be started from SSH on `win-home`:
+
+```powershell
+$clash = 'D:\Program Files\Clash Verge\clash-verge.exe'
+if (Test-Path $clash) { Start-Process -FilePath $clash -WorkingDirectory (Split-Path $clash) }
+```
+
+Wait a few seconds, then verify `127.0.0.1:7897` before using it. If Clash Verge
+does not start or `7897` stays closed, assume the PC has no usable outbound
+network in that session and use an SSH-transferred Git bundle as the validation
+fallback:
 
 ```sh
 git bundle create /tmp/module_context.bundle main

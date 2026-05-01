@@ -45,6 +45,7 @@ QWidget#ImageInfoWidget{background:#FFFFFF;border:1px solid #DCDCDC;}
 QLabel[infoRole=&quot;name&quot;]{background:#FFFFFF;color:#606266;border-right:1px solid #DCDCDC;border-bottom:1px solid #DCDCDC;padding-left:14px;}
 QLabel[infoRole=&quot;value&quot;]{background:#FFFFFF;color:#303133;border-bottom:1px solid #DCDCDC;padding-left:22px;}
 QTableWidget{background:#FFFFFF;alternate-background-color:#FAFAFA;border:1px solid #DCDFE6;gridline-color:#E4E7ED;selection-background-color:#EAF4FF;selection-color:#1E6BB8;outline:none;}
+QGraphicsView{background:#FFFFFF;border:1px solid #C9CDD4;border-radius:2px;}
 QTableWidget::item{padding:4px;border:none;}
 QHeaderView::section{background:#F5F7FA;color:#303133;border:none;border-right:1px solid #DCDFE6;border-bottom:1px solid #DCDFE6;padding:4px;font-weight:bold;}
 QWidget[queueCard=&quot;true&quot;]{background:#FFFFFF;border:1px solid #DCDFE6;border-radius:4px;}
@@ -56,7 +57,13 @@ QLabel#InspectionResultValueLabel[resultState=&quot;NG&quot;]{color:#D93026;font
 QLabel#InspectionResultValueLabel[resultState=&quot;OK&quot;]{color:#18A058;font-weight:bold;}
 QWidget#BottomStatusBar{background:#FFFFFF;border-top:1px solid #DCDFE6;}
 QLabel[bottomRole=&quot;status&quot;]{color:#606266;font-size:12px;}
-QScrollBar:vertical{background:#F5F7FA;width:12px;margin:0px;border:none;}QScrollBar::handle:vertical{background:#C0C4CC;border-radius:5px;min-height:30px;margin:2px;}QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0px;background:none;border:none;}
+QScrollBar:vertical{background:#F5F7FA;width:12px;margin:0px;border:none;}
+QScrollBar::handle:vertical{background:#C0C4CC;border-radius:5px;min-height:30px;margin:2px;}
+QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0px;background:none;border:none;}
+QScrollBar:horizontal{background:#F5F7FA;height:12px;margin:0px;border:none;}
+QScrollBar::handle:horizontal{background:#C0C4CC;border-radius:5px;min-width:30px;margin:2px;}
+QScrollBar::add-line:horizontal,QScrollBar::sub-line:horizontal{width:0px;background:none;border:none;}
+QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical,QScrollBar::add-page:horizontal,QScrollBar::sub-page:horizontal{background:none;border:none;}
 QWidget#BottomStatusBar{background:#F5F7FA;}</string>
   </property>
   <widget class="QWidget" name="centralWidget">

@@ -187,8 +187,11 @@ if (Test-Path $clash) { Start-Process -FilePath $clash -WorkingDirectory (Split-
 
 Wait a few seconds, then verify `127.0.0.1:7897` before using it. If Clash Verge
 does not start or `7897` stays closed, assume the PC has no usable outbound
-network in that session and use an SSH-transferred Git bundle as the validation
-fallback:
+network in that session. Do the startup and the Git/download operation in the
+same SSH script; OpenSSH can clean up GUI child processes when the SSH session
+exits, so a proxy started in one command may be gone by the next command. If the
+proxy path is still unavailable, use an SSH-transferred Git bundle as the
+validation fallback:
 
 ```sh
 git bundle create /tmp/module_context.bundle main

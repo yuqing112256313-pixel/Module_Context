@@ -83,7 +83,7 @@ cat >"${tmp_script}" <<PS1
 \$pwsh = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
 if (-not (Test-Path \$pwsh)) {
     \$process = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", \$installer, "/qn", "ADD_PATH=1", "DISABLE_TELEMETRY=1", "/norestart" -Wait -PassThru
-    if (\$process.ExitCode -ne 0) { throw "PowerShell installer failed with exit code \$($process.ExitCode)." }
+    if (\$process.ExitCode -ne 0) { throw ("PowerShell installer failed with exit code {0}." -f \$process.ExitCode) }
 }
 & \$pwsh --version
 PS1

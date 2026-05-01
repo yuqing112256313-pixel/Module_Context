@@ -35,6 +35,18 @@ function Find-Exe {
     throw "$Name was not found."
 }
 
+function Invoke-Checked {
+    param(
+        [string]$FilePath,
+        [string[]]$Arguments
+    )
+
+    & $FilePath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "$FilePath failed with exit code $LASTEXITCODE."
+    }
+}
+
 $git = Find-Exe "git.exe" @(
     "C:\Program Files\Git\cmd\git.exe",
     "C:\Program Files\Git\bin\git.exe"
@@ -98,16 +110,21 @@ $cmake = Find-Exe "cmake.exe" @(
 )
 
 Write-Host "Configuring preset: $Preset"
-& $cmake --preset $Preset
+Push-Location $WorkDir
+try {
+    Invoke-Checked $cmake @("--preset", $Preset)
 
-Write-Host "Building preset: $Preset"
-& $cmake --build --preset $Preset
+    Write-Host "Building preset: $Preset"
+    Invoke-Checked $cmake @("--build", "--preset", $Preset)
 
-if (-not $SkipTests) {
-    Write-Host "Testing preset: $Preset"
-    $ctest = Join-Path (Split-Path -Parent $cmake) "ctest.exe"
-    if (-not (Test-Path $ctest)) {
-        $ctest = Find-Exe "ctest.exe"
+    if (-not $SkipTests) {
+        Write-Host "Testing preset: $Preset"
+        $ctest = Join-Path (Split-Path -Parent $cmake) "ctest.exe"
+        if (-not (Test-Path $ctest)) {
+            $ctest = Find-Exe "ctest.exe"
+        }
+        Invoke-Checked $ctest @("--preset", $Preset)
     }
-    & $ctest --preset $Preset
+} finally {
+    Pop-Location
 }

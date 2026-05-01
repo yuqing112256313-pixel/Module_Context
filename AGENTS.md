@@ -110,9 +110,39 @@ verified local archives because public download links and account requirements
 change over time. After installing them, re-run `Test-WindowsBuildEnv.ps1`
 before attempting a Qt build.
 
-For VS2015, install the x64 C++ toolchain and Windows SDK components. For Qt,
-install the `msvc2015_64` kit and confirm both `bin\qmake.exe` and
-`lib\cmake\Qt5\Qt5Config.cmake` exist.
+VS2015 manual install:
+
+- Use the official Visual Studio Older Downloads page and sign in with a
+  Microsoft account that has Dev Essentials or a Visual Studio subscription.
+- Prefer `Visual Studio Community 2015 with Update 3` or
+  `Visual C++ Build Tools for Visual Studio 2015`.
+- Run the installer from the Windows desktop as Administrator.
+- Choose a custom install and include:
+  - Visual C++ / Common Tools for Visual C++ 2015.
+  - x64 compiler tools.
+  - Windows SDK components offered by the VS2015 installer.
+- Expected verification paths:
+  - `C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat`
+  - `C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe`
+
+Qt 5.9.7 manual install:
+
+- Use the official Qt archive:
+  `https://download.qt.io/archive/qt/5.9/5.9.7/qt-opensource-windows-x86-5.9.7.exe`.
+- Run the installer from the Windows desktop as Administrator.
+- Install to `C:\Qt\Qt5.9.7` if the installer asks for a root path.
+- Select the `Qt 5.9.7 > msvc2015_64` component. Qt Creator is optional.
+- After install, either the default path should exist:
+  `C:\Qt\Qt5.9.7\5.9.7\msvc2015_64`, or set:
+
+```powershell
+setx QT597_MSVC2015_64_DIR "D:\path\to\5.9.7\msvc2015_64"
+```
+
+Verification files:
+
+- `bin\qmake.exe`
+- `lib\cmake\Qt5\Qt5Config.cmake`
 
 ## Build Notes
 

@@ -33,6 +33,15 @@ possible. The ECS host can access GitHub, but direct release-asset downloads can
 be very slow. `bootstrap-ecs-from-mac.sh` auto-detects the macOS Wi-Fi HTTP
 proxy or uses `LOCAL_HTTP_PROXY`, `HTTPS_PROXY`, or `HTTP_PROXY` if set.
 
+For multi-GB installer uploads to Windows OpenSSH, prefer legacy scp mode:
+
+```sh
+scp -O -p -o Compression=no installer.iso aliyun-win:'C:/Installers/OfflinePackages/'
+```
+
+The default OpenSSH SFTP mode may create a 0-byte destination file and not show
+growth until close, which makes large transfer monitoring misleading.
+
 ## Windows Toolchain Targets
 
 The legacy GUI validation target is:

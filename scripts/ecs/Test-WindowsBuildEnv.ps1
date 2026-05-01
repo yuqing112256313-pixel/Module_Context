@@ -82,6 +82,11 @@ $git = Test-Command "git.exe" @(
 )
 if ($git) { & $git --version }
 
+$pwsh = Test-Command "pwsh.exe" @(
+    "C:\Program Files\PowerShell\7\pwsh.exe"
+) -Required $false
+if ($pwsh) { & $pwsh --version }
+
 $cmake = Test-Command "cmake.exe" @(
     "C:\Program Files\CMake\bin\cmake.exe",
     "C:\toolchains\portable\cmake-4.3.2-windows-x86_64\bin\cmake.exe"

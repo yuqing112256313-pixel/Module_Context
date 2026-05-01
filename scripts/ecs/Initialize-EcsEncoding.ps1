@@ -84,4 +84,4 @@ if (-not $SkipGitConfig) {
 }
 
 Write-Host "UTF-8 session/profile configuration installed."
-Write-Host "中文输出测试: 模块上下文 ECS 构建环境"
+Write-Host "中文输出测试: 模块上下文 Windows 构建环境"

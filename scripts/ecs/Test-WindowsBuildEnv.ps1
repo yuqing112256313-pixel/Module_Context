@@ -103,18 +103,23 @@ if ($ninja) { & $ninja --version }
 
 $msbuild = Test-Command "MSBuild.exe" @(
     "C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe",
+    "H:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe",
     "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\MSBuild.exe",
     "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe"
 ) -Required $RequireVS2015
 if ($msbuild) { & $msbuild -version | Select-Object -Last 1 }
 
 $vs140VcVars = Test-PathExists "VS2015 vcvarsall.bat" @(
-    "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat"
+    "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat",
+    "H:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat",
+    "H:\Microsoft Visual Studio 14.0\VC\vcvarsall.bat"
 ) -Required $RequireVS2015
 
 $qtCandidates = @()
 if ($QtDir) { $qtCandidates += $QtDir }
 $qtCandidates += @(
+    "H:\Qt\Qt5.9.7\5.9.7\msvc2015_64",
+    "H:\Qt\5.9.7\msvc2015_64",
     "C:\Qt\Qt5.9.7\5.9.7\msvc2015_64",
     "C:\Qt\5.9.7\msvc2015_64"
 )

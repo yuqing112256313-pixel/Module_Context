@@ -66,7 +66,7 @@
       "inherits": "windows-vs2015-x64",
       "binaryDir": "${sourceDir}/build/windows-vs2015-x64-qt597",
       "cacheVariables": {
-        "CMAKE_PREFIX_PATH": "$env{QT597_MSVC2015_64_DIR};C:/Qt/Qt5.9.7/5.9.7/msvc2015_64;C:/Qt/5.9.7/msvc2015_64",
+        "CMAKE_PREFIX_PATH": "$env{QT597_MSVC2015_64_DIR};H:/Qt/Qt5.9.7/5.9.7/msvc2015_64;H:/Qt/5.9.7/msvc2015_64;C:/Qt/Qt5.9.7/5.9.7/msvc2015_64;C:/Qt/5.9.7/msvc2015_64",
         "MC_BUILD_TASK_FLOW_E2E": "ON",
         "MC_BUILD_TASK_FLOW_QT_DEMO": "ON"
       }

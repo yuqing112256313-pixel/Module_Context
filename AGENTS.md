@@ -69,7 +69,7 @@ The legacy GUI validation target is:
 Default expected install paths:
 
 - VS2015: `C:\Program Files (x86)\Microsoft Visual Studio 14.0`
-- Qt: `C:\Qt\Qt5.9.7\5.9.7\msvc2015_64` or `C:\Qt\5.9.7\msvc2015_64`
+- Qt: prefer `H:\Qt\Qt5.9.7\5.9.7\msvc2015_64`; `C:\Qt\...` is also recognized.
 - CMake: available on `PATH`
 
 If Qt is installed elsewhere, set:
@@ -143,6 +143,9 @@ VS2015 manual install:
   - Visual C++ / Common Tools for Visual C++ 2015.
   - x64 compiler tools.
   - Windows SDK components offered by the VS2015 installer.
+- Prefer the default VS2015 path if the installer offers no clean custom path;
+  old Visual Studio installers still put shared components and registry entries
+  under system locations even when part of the payload is moved.
 - Expected verification paths:
   - `C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat`
   - `C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe`
@@ -152,10 +155,10 @@ Qt 5.9.7 manual install:
 - Use the official Qt archive:
   `https://download.qt.io/archive/qt/5.9/5.9.7/qt-opensource-windows-x86-5.9.7.exe`.
 - Run the installer from the Windows desktop as Administrator.
-- Install to `C:\Qt\Qt5.9.7` if the installer asks for a root path.
+- Install to `H:\Qt\Qt5.9.7` if the installer asks for a root path.
 - Select the `Qt 5.9.7 > msvc2015_64` component. Qt Creator is optional.
-- After install, either the default path should exist:
-  `C:\Qt\Qt5.9.7\5.9.7\msvc2015_64`, or set:
+- After install, either the preferred path should exist:
+  `H:\Qt\Qt5.9.7\5.9.7\msvc2015_64`, or set:
 
 ```powershell
 setx QT597_MSVC2015_64_DIR "D:\path\to\5.9.7\msvc2015_64"

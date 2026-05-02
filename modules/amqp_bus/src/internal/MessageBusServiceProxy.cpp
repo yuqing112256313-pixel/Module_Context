@@ -18,10 +18,10 @@ foundation::base::Result<void> MakeInvalidArgument(const std::string& message) {
         message);
 }
 
-std::shared_ptr<RabbitMqConnectionDriver> LookupDriver(
-    const std::shared_ptr<RabbitMqBusSharedState>& state) {
+std::shared_ptr<AmqpConnectionDriver> LookupDriver(
+    const std::shared_ptr<AmqpBusSharedState>& state) {
     if (!state) {
-        return std::shared_ptr<RabbitMqConnectionDriver>();
+        return std::shared_ptr<AmqpConnectionDriver>();
     }
 
     // 每次调用都取当前 driver，而不是在 proxy 中缓存 driver。这样模块重启或重连
@@ -33,7 +33,7 @@ std::shared_ptr<RabbitMqConnectionDriver> LookupDriver(
 }  // namespace
 
 MessageBusServiceProxy::MessageBusServiceProxy(
-    const std::shared_ptr<RabbitMqBusSharedState>& state)
+    const std::shared_ptr<AmqpBusSharedState>& state)
     : state_(state) {
 }
 

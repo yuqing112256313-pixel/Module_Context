@@ -54,10 +54,10 @@ bool RunSingleServiceCase() {
         return false;
     }
 
-    const std::string instance_name = "rabbitmq_bus_instance";
+    const std::string instance_name = "amqp_bus_instance";
     foundation::base::Result<void> load_result =
-        manager->LoadModule(instance_name, MC_TEST_RABBITMQ_BUS_PLUGIN_PATH);
-    if (!Expect(load_result.IsOk(), "LoadModule should load rabbitmq_bus plugin")) {
+        manager->LoadModule(instance_name, MC_TEST_AMQP_BUS_PLUGIN_PATH);
+    if (!Expect(load_result.IsOk(), "LoadModule should load amqp_bus plugin")) {
         return false;
     }
 
@@ -111,7 +111,7 @@ bool RunSingleServiceCase() {
     }
 
     foundation::base::Result<void> fini_result = context.Fini();
-    if (!Expect(fini_result.IsOk(), "Fini should unload rabbitmq_bus plugin")) {
+    if (!Expect(fini_result.IsOk(), "Fini should unload amqp_bus plugin")) {
         return false;
     }
 
@@ -127,7 +127,7 @@ bool RunSingleServiceCase() {
     return true;
 }
 
-bool RunConfigTypeAliasCase() {
+bool RunConfigFileCase() {
     std::ostringstream config;
     config
         << "{\n"
@@ -137,20 +137,20 @@ bool RunConfigTypeAliasCase() {
         << "      \"name\": \"amqp_bus_instance\",\n"
         << "      \"type\": \"amqp_bus\",\n"
         << "      \"library_path\": \""
-        << JsonEscape(MC_TEST_RABBITMQ_BUS_PLUGIN_PATH) << "\",\n"
+        << JsonEscape(MC_TEST_AMQP_BUS_PLUGIN_PATH) << "\",\n"
         << "      \"config\": {}\n"
         << "    },\n"
         << "    {\n"
-        << "      \"name\": \"legacy_rabbitmq_bus_instance\",\n"
-        << "      \"type\": \"rabbitmq_bus\",\n"
+        << "      \"name\": \"amqp_bus_backup_instance\",\n"
+        << "      \"type\": \"amqp_bus\",\n"
         << "      \"library_path\": \""
-        << JsonEscape(MC_TEST_RABBITMQ_BUS_PLUGIN_PATH) << "\",\n"
+        << JsonEscape(MC_TEST_AMQP_BUS_PLUGIN_PATH) << "\",\n"
         << "      \"config\": {}\n"
         << "    }\n"
         << "  ]\n"
         << "}\n";
 
-    if (!WriteConfigFile("rabbitmq_bus_alias_config.json", config.str())) {
+    if (!WriteConfigFile("amqp_bus_config.json", config.str())) {
         return false;
     }
 
@@ -161,32 +161,32 @@ bool RunConfigTypeAliasCase() {
     }
 
     foundation::base::Result<void> load_result =
-        manager->LoadModules(ConfigPath("rabbitmq_bus_alias_config.json"));
+        manager->LoadModules(ConfigPath("amqp_bus_config.json"));
     if (!Expect(
             load_result.IsOk(),
-            "LoadModules should accept amqp_bus and legacy rabbitmq_bus types")) {
+            "LoadModules should accept amqp_bus module entries")) {
         return false;
     }
 
     foundation::base::Result<module_context::framework::IModule*> platform_module =
         manager->Module<module_context::framework::IModule>("amqp_bus_instance");
-    foundation::base::Result<module_context::framework::IModule*> legacy_module =
+    foundation::base::Result<module_context::framework::IModule*> backup_module =
         manager->Module<module_context::framework::IModule>(
-            "legacy_rabbitmq_bus_instance");
+            "amqp_bus_backup_instance");
     if (!Expect(
-            platform_module.IsOk() && legacy_module.IsOk(),
-            "Both platform and legacy type entries should load")) {
+            platform_module.IsOk() && backup_module.IsOk(),
+            "Both AMQP bus config entries should load")) {
         return false;
     }
     if (!Expect(
             platform_module.Value()->ModuleType() == "amqp_bus" &&
-                legacy_module.Value()->ModuleType() == "amqp_bus",
+                backup_module.Value()->ModuleType() == "amqp_bus",
             "Both entries should expose amqp_bus as the standard runtime type")) {
         return false;
     }
 
     foundation::base::Result<void> fini_result = context.Fini();
-    if (!Expect(fini_result.IsOk(), "Fini should unload alias config modules")) {
+    if (!Expect(fini_result.IsOk(), "Fini should unload config modules")) {
         return false;
     }
 
@@ -201,14 +201,14 @@ bool RunMultipleServiceCase() {
     }
 
     foundation::base::Result<void> first_load =
-        manager->LoadModule("bus_primary", MC_TEST_RABBITMQ_BUS_PLUGIN_PATH);
-    if (!Expect(first_load.IsOk(), "Primary rabbitmq_bus plugin should load")) {
+        manager->LoadModule("bus_primary", MC_TEST_AMQP_BUS_PLUGIN_PATH);
+    if (!Expect(first_load.IsOk(), "Primary amqp_bus plugin should load")) {
         return false;
     }
 
     foundation::base::Result<void> second_load =
-        manager->LoadModule("bus_backup", MC_TEST_RABBITMQ_BUS_PLUGIN_PATH);
-    if (!Expect(second_load.IsOk(), "Backup rabbitmq_bus plugin should load")) {
+        manager->LoadModule("bus_backup", MC_TEST_AMQP_BUS_PLUGIN_PATH);
+    if (!Expect(second_load.IsOk(), "Backup amqp_bus plugin should load")) {
         return false;
     }
 
@@ -239,7 +239,7 @@ bool RunMultipleServiceCase() {
     }
 
     foundation::base::Result<void> fini_result = context.Fini();
-    if (!Expect(fini_result.IsOk(), "Fini should unload all rabbitmq_bus plugins")) {
+    if (!Expect(fini_result.IsOk(), "Fini should unload all amqp_bus plugins")) {
         return false;
     }
 
@@ -252,13 +252,13 @@ int main() {
     if (!RunSingleServiceCase()) {
         return 1;
     }
-    if (!RunConfigTypeAliasCase()) {
+    if (!RunConfigFileCase()) {
         return 1;
     }
     if (!RunMultipleServiceCase()) {
         return 1;
     }
 
-    std::cout << "[PASSED] rabbitmq_bus_plugin_integration_test" << std::endl;
+    std::cout << "[PASSED] amqp_bus_plugin_integration_test" << std::endl;
     return 0;
 }

@@ -6,7 +6,6 @@
 #include "foundation/base/Result.h"
 
 #include <string>
-#include <vector>
 
 namespace module_context {
 namespace framework {
@@ -103,30 +102,6 @@ public:
      * @return 当前模块状态。
      */
     virtual ModuleState State() const = 0;
-};
-
-/**
- * @brief 模块类型元信息的可选扩展接口。
- *
- * 框架加载模块时，`IModule::ModuleType()` 是插件的标准类型名。模块若经历过
- * 类型名迁移，可以额外实现该接口返回兼容别名，让旧配置继续通过类型校验。
- *
- * 该接口独立于 `IModule`，避免给所有既有插件增加新的纯虚函数；模块管理器会在
- * 校验阶段通过 `dynamic_cast` 探测是否支持。
- */
-class MC_FRAMEWORK_API IModuleTypeMetadata {
-public:
-    /**
-     * @brief 析构元信息接口。
-     */
-    virtual ~IModuleTypeMetadata() {}
-
-    /**
-     * @brief 返回该模块类型接受的兼容别名。
-     *
-     * @return 兼容类型名列表，不应包含 `IModule::ModuleType()` 返回的标准类型名。
-     */
-    virtual std::vector<std::string> ModuleTypeAliases() const = 0;
 };
 
 }  // namespace framework

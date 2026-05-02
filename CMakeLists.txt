@@ -19,7 +19,6 @@ endif()
 
 option(MC_BUILD_TESTS "Build test targets" ON)
 option(MC_BUILD_AMQP_BUS_MODULE "Build AMQP message bus module" ON)
-option(MC_BUILD_RABBITMQ_MODULE "Build legacy RabbitMQ message bus target alias" ON)
 option(MC_BUILD_HTTP_TRANSPORT_MODULE "Build HTTP transfer module" ON)
 option(MC_BUILD_SEMIPLUGIN_MANAGER_MODULE "Build SEMI algorithm plugin manager module" ON)
 option(MC_BUILD_TASK_FLOW_E2E "Build Windows task-flow end-to-end test targets" OFF)
@@ -303,8 +302,7 @@ install(
         ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-if((MC_BUILD_AMQP_BUS_MODULE OR MC_BUILD_RABBITMQ_MODULE OR
-    MC_BUILD_HTTP_TRANSPORT_MODULE OR
+if((MC_BUILD_AMQP_BUS_MODULE OR MC_BUILD_HTTP_TRANSPORT_MODULE OR
     MC_BUILD_SEMIPLUGIN_MANAGER_MODULE) AND
    EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/modules/CMakeLists.txt")
     add_subdirectory(modules)

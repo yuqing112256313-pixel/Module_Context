@@ -85,7 +85,7 @@ function(mc_ensure_amqp_dependency)
     FetchContent_MakeAvailable(amqpcpp)
 endfunction()
 
-if(MC_BUILD_AMQP_BUS_MODULE OR MC_BUILD_RABBITMQ_MODULE)
+if(MC_BUILD_AMQP_BUS_MODULE)
     mc_ensure_amqp_dependency()
 
     if(NOT TARGET amqpcpp)
@@ -95,7 +95,7 @@ if(MC_BUILD_AMQP_BUS_MODULE OR MC_BUILD_RABBITMQ_MODULE)
             "fetch ${MC_AMQP_CPP_GIT_REPOSITORY}.")
     endif()
 
-    add_subdirectory(rabbitmq_bus)
+    add_subdirectory(amqp_bus)
 endif()
 
 if(MC_BUILD_HTTP_TRANSPORT_MODULE)

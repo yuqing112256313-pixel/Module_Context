@@ -461,7 +461,7 @@ if ($UseAlgorithmPlugin) {
     }
 }
 $runtimeDir = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    Join-Path $ExamplesDir 'rabbitmq_task_flow_worker_runtime'
+    Join-Path $ExamplesDir 'amqp_task_flow_worker_runtime'
 } else {
     Resolve-OutputDirectoryPath -Path $OutputRoot -BasePath (Get-Location).Path -Name 'OutputRoot'
 }

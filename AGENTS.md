@@ -151,7 +151,7 @@ pwsh -ExecutionPolicy Bypass -File H:\Codex\Module_Context\scripts\ecs\Start-Rab
 Run the E2E gate:
 
 ```powershell
-ctest --preset windows-vs2015-x64-qt597-debug -R mc_rabbitmq_task_flow_e2e --output-on-failure
+ctest --preset windows-vs2015-x64-qt597-debug -R mc_amqp_task_flow_e2e --output-on-failure
 ```
 
 The RabbitMQ service runs outside the SSH user session, so
@@ -252,7 +252,7 @@ Keep `_offline_installers/` and `_remote_screenshots/` out of Git.
   checkout or after restoring `third_party/Foundation`; configure patches
   Foundation's Apple platform detection locally. A direct build can fail with
   `Unsupported platform`.
-- The Qt preset can build the task-flow GUI without RabbitMQ; RabbitMQ E2E needs
+- The Qt preset can build the task-flow GUI without RabbitMQ; AMQP E2E over RabbitMQ needs
   both Management API `15672` and AMQP `5672`.
 - PowerShell variable names are case-insensitive; avoid `$home` as a local
   variable because it collides with built-in `$HOME`.

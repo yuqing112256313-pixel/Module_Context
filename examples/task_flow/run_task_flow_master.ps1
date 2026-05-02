@@ -1111,7 +1111,7 @@ $rabbitPluginDll = Resolve-ExampleArtifact -Name 'amqp_bus'
 $httpPluginDll = Resolve-ExampleArtifact -Name 'http_transport'
 
 $runtimeDir = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    Join-Path $ExamplesDir 'rabbitmq_task_flow_runtime'
+    Join-Path $ExamplesDir 'amqp_task_flow_runtime'
 } else {
     Resolve-OutputDirectoryPath -Path $OutputRoot -BasePath (Get-Location).Path -Name 'OutputRoot'
 }

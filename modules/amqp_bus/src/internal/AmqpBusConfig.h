@@ -72,10 +72,9 @@ struct PublisherSpec {
 /**
  * @brief AMQP bus 模块完整运行配置。
  *
- * 字段采用 AMQP 通用语义。标准模块类型为 `amqp_bus`，`rabbitmq_bus` 仅作为
- * 旧配置别名；实现主体没有依赖 RabbitMQ Management API。
+ * 字段采用 AMQP 通用语义；实现主体不依赖任何 broker 的私有管理 API。
  */
-struct RabbitMqBusConfig {
+struct AmqpBusConfig {
     ConnectionConfig connection;
     std::size_t worker_thread_count;
     std::vector<ExchangeSpec> exchanges;
@@ -87,7 +86,7 @@ struct RabbitMqBusConfig {
     // 不支持该扩展，可在配置 features.publisher_confirm=false 关闭。
     bool publisher_confirms_enabled;
 
-    RabbitMqBusConfig()
+    AmqpBusConfig()
         : connection(),
           worker_thread_count(4),
           exchanges(),

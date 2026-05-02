@@ -3,7 +3,7 @@
 `module_context_core` 是面向 Windows 离线交付的 CMake 工程，包含：
 
 - 核心 Module-Context 框架，接口在 `include/`，实现 在 `src/`。
-- 平台能力模块：`rabbitmq_bus` 控制面通信、`http_transport` 通用 HTTP 二进制流传输。
+- 平台能力模块：`amqp_bus` AMQP 控制面通信、`http_transport` 通用 HTTP 二进制流传输。
 - `examples/task_flow` 端到端示例：Master 内存图片、RabbitMQ 共享任务队列、Worker 通过 HTTP 拉图到内存并回传结果。
 - `tests/` 单元测试和插件集成测试。
 - `third_party/` 离线三方依赖源码。
@@ -64,7 +64,7 @@ cmake --build build --config Debug
 ```powershell
 cmake -S . -B build-e2e `
   -DMC_BUILD_TESTS=ON `
-  -DMC_BUILD_RABBITMQ_MODULE=ON `
+  -DMC_BUILD_AMQP_BUS_MODULE=ON `
   -DMC_BUILD_HTTP_TRANSPORT_MODULE=ON `
   -DMC_BUILD_TASK_FLOW_E2E=ON
 cmake --build build-e2e --config Debug

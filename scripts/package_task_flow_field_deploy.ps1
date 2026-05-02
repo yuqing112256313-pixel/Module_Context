@@ -138,7 +138,6 @@ if (-not $SkipBuild) {
         "-DCMAKE_BUILD_TYPE=$Configuration" `
         -DMC_BUILD_TESTS=ON `
         -DMC_BUILD_AMQP_BUS_MODULE=ON `
-        -DMC_BUILD_RABBITMQ_MODULE=ON `
         -DMC_BUILD_HTTP_TRANSPORT_MODULE=ON `
         -DMC_BUILD_SEMIPLUGIN_MANAGER_MODULE=ON `
         -DMC_BUILD_TASK_FLOW_E2E=ON
@@ -160,7 +159,7 @@ $workerRoot = Join-Path $stageRoot 'TaskFlowWorker'
 $masterBin = Join-Path $masterRoot 'build\examples\task_flow'
 $workerBin = Join-Path $workerRoot 'build\examples\task_flow'
 $buildTaskFlowDir = Join-Path $BuildDir 'examples\task_flow'
-$buildRabbitMqDll = Join-Path $BuildDir 'modules\rabbitmq_bus\amqp_bus.dll'
+$buildAmqpBusDll = Join-Path $BuildDir 'modules\amqp_bus\amqp_bus.dll'
 $buildHttpTransportDll = Join-Path $BuildDir 'modules\http_transport\http_transport.dll'
 $buildSemipluginManagerDll = Join-Path $BuildDir 'modules\semiplugin_manager\semiplugin_manager.dll'
 $buildTgvEtchingPluginDll = Join-Path $buildTaskFlowDir 'tgv_etching_semiplugin.dll'
@@ -173,7 +172,7 @@ foreach ($name in @(
 )) {
     Copy-RequiredFile -Source (Join-Path $buildTaskFlowDir $name) -DestinationDirectory $masterBin
 }
-Copy-RequiredFile -Source $buildRabbitMqDll -DestinationDirectory $masterBin
+Copy-RequiredFile -Source $buildAmqpBusDll -DestinationDirectory $masterBin
 Copy-RequiredFile -Source $buildHttpTransportDll -DestinationDirectory $masterBin
 foreach ($name in @('libc++.dll', 'libunwind.dll', 'libwinpthread-1.dll')) {
     $runtimePath = Join-Path $mingwBin $name
@@ -188,7 +187,7 @@ foreach ($name in @(
 )) {
     Copy-RequiredFile -Source (Join-Path $buildTaskFlowDir $name) -DestinationDirectory $workerBin
 }
-Copy-RequiredFile -Source $buildRabbitMqDll -DestinationDirectory $workerBin
+Copy-RequiredFile -Source $buildAmqpBusDll -DestinationDirectory $workerBin
 Copy-RequiredFile -Source $buildHttpTransportDll -DestinationDirectory $workerBin
 Copy-RequiredFile -Source $buildSemipluginManagerDll -DestinationDirectory $workerBin
 Copy-RequiredFile -Source $buildTgvEtchingPluginDll -DestinationDirectory $workerBin

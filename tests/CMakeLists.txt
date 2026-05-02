@@ -73,28 +73,23 @@ add_test(
     COMMAND mc_module_manager_config_test
 )
 
-if(TARGET amqp_bus OR TARGET rabbitmq_bus)
-    if(TARGET amqp_bus)
-        set(MC_TEST_MESSAGE_BUS_PLUGIN_TARGET amqp_bus)
-    else()
-        set(MC_TEST_MESSAGE_BUS_PLUGIN_TARGET rabbitmq_bus)
-    endif()
-
-    add_executable(mc_rabbitmq_bus_module_test
-        rabbitmq_bus_module_test.cpp
-        ../modules/rabbitmq_bus/src/internal/MessageBusServiceProxy.cpp
-        ../modules/rabbitmq_bus/src/RabbitMqBusModule.cpp
+if(TARGET amqp_bus)
+    add_executable(mc_amqp_bus_module_test
+        amqp_bus_module_test.cpp
+        ../modules/amqp_bus/src/internal/AmqpConnectionDriver.cpp
+        ../modules/amqp_bus/src/internal/MessageBusServiceProxy.cpp
+        ../modules/amqp_bus/src/AmqpBusModule.cpp
     )
 
-    mc_configure_test_target(mc_rabbitmq_bus_module_test)
+    mc_configure_test_target(mc_amqp_bus_module_test)
 
-    target_include_directories(mc_rabbitmq_bus_module_test
+    target_include_directories(mc_amqp_bus_module_test
         PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../modules/rabbitmq_bus/src
-            ${CMAKE_CURRENT_SOURCE_DIR}/../modules/rabbitmq_bus/src/internal
+            ${CMAKE_CURRENT_SOURCE_DIR}/../modules/amqp_bus/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/../modules/amqp_bus/src/internal
     )
 
-    target_link_libraries(mc_rabbitmq_bus_module_test
+    target_link_libraries(mc_amqp_bus_module_test
         PRIVATE
             amqpcpp
             mc_core_framework
@@ -102,40 +97,40 @@ if(TARGET amqp_bus OR TARGET rabbitmq_bus)
     )
 
     if(WIN32)
-        target_link_libraries(mc_rabbitmq_bus_module_test PRIVATE ws2_32)
+        target_link_libraries(mc_amqp_bus_module_test PRIVATE ws2_32)
     endif()
 
-    add_executable(mc_rabbitmq_bus_plugin_integration_test
-        rabbitmq_bus_plugin_integration_test.cpp
+    add_executable(mc_amqp_bus_plugin_integration_test
+        amqp_bus_plugin_integration_test.cpp
     )
 
-    mc_configure_test_target(mc_rabbitmq_bus_plugin_integration_test)
+    mc_configure_test_target(mc_amqp_bus_plugin_integration_test)
 
-    target_link_libraries(mc_rabbitmq_bus_plugin_integration_test
+    target_link_libraries(mc_amqp_bus_plugin_integration_test
         PRIVATE
             mc_core_framework
             foundation::foundation
     )
 
-    target_compile_definitions(mc_rabbitmq_bus_plugin_integration_test
+    target_compile_definitions(mc_amqp_bus_plugin_integration_test
         PRIVATE
             MC_TEST_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}"
-            MC_TEST_RABBITMQ_BUS_PLUGIN_PATH="$<TARGET_FILE:${MC_TEST_MESSAGE_BUS_PLUGIN_TARGET}>"
+            MC_TEST_AMQP_BUS_PLUGIN_PATH="$<TARGET_FILE:amqp_bus>"
     )
 
     add_test(
-        NAME mc_rabbitmq_bus_module_test
-        COMMAND mc_rabbitmq_bus_module_test
+        NAME mc_amqp_bus_module_test
+        COMMAND mc_amqp_bus_module_test
     )
 
     add_test(
-        NAME mc_rabbitmq_bus_plugin_integration_test
-        COMMAND mc_rabbitmq_bus_plugin_integration_test
+        NAME mc_amqp_bus_plugin_integration_test
+        COMMAND mc_amqp_bus_plugin_integration_test
     )
 
     if(MC_BUILD_TASK_FLOW_E2E AND WIN32)
         add_test(
-            NAME mc_rabbitmq_task_flow_e2e
+            NAME mc_amqp_task_flow_e2e
             COMMAND powershell
                 -ExecutionPolicy Bypass
                 -File ${CMAKE_CURRENT_SOURCE_DIR}/../examples/task_flow/run_task_flow_e2e.ps1
@@ -144,7 +139,7 @@ if(TARGET amqp_bus OR TARGET rabbitmq_bus)
                 -SkipIfRabbitMqUnavailable
         )
         set_tests_properties(
-            mc_rabbitmq_task_flow_e2e
+            mc_amqp_task_flow_e2e
             PROPERTIES
                 SKIP_RETURN_CODE 77
                 TIMEOUT 420

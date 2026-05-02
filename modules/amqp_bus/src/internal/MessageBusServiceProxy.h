@@ -8,7 +8,7 @@
 namespace module_context {
 namespace messaging {
 
-struct RabbitMqBusSharedState;
+struct AmqpBusSharedState;
 
 /**
  * @brief `IMessageBusService` 的运行态代理。
@@ -19,7 +19,7 @@ struct RabbitMqBusSharedState;
 class MessageBusServiceProxy : public IMessageBusService {
 public:
     explicit MessageBusServiceProxy(
-        const std::shared_ptr<RabbitMqBusSharedState>& state);
+        const std::shared_ptr<AmqpBusSharedState>& state);
     ~MessageBusServiceProxy() override;
 
     foundation::base::Result<void> Publish(
@@ -45,7 +45,7 @@ public:
 
 private:
     // 不拥有具体 driver，只持有共享状态以便每次调用查找当前 driver。
-    std::shared_ptr<RabbitMqBusSharedState> state_;
+    std::shared_ptr<AmqpBusSharedState> state_;
 };
 
 }  // namespace messaging

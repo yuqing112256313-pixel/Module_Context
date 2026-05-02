@@ -7,20 +7,11 @@
 #endif
 #endif
 
-#include "RabbitMqBusModule.h"
-#include "internal/ConfigTypes.h"
-#include "internal/DriverOps.h"
-#include "internal/MessageBusServiceProxy.h"
-#include "internal/SharedState.h"
-
-#include "module_context/framework/IModuleManager.h"
-
-#include "module_context/plugin/ModuleFactory.h"
+#include "DriverOps.h"
 
 #include "foundation/base/ErrorCode.h"
 #include "foundation/base/NonCopyable.h"
 #include "foundation/base/Platform.h"
-#include "foundation/concurrent/ThreadPool.h"
 #include "foundation/log/Logger.h"
 
 #include <amqpcpp.h>
@@ -33,6 +24,7 @@
 #include <cstring>
 #include <deque>
 #include <exception>
+#include <functional>
 #include <future>
 #include <limits>
 #include <map>
@@ -122,18 +114,6 @@ struct PendingPublishConfirm {
           returned(false),
           reply_code(0),
           reply_text() {
-    }
-};
-
-struct DeliveryContext {
-    std::string consumer_name;
-    std::uint64_t delivery_tag;
-    bool auto_ack;
-
-    DeliveryContext()
-        : consumer_name(),
-          delivery_tag(0),
-          auto_ack(false) {
     }
 };
 
@@ -995,20 +975,20 @@ foundation::base::Result<void> ParseUniqueArray(
     return foundation::base::MakeSuccess();
 }
 
-foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
+foundation::base::Result<AmqpBusConfig> ParseBusConfig(
     const foundation::config::ConfigValue& config_value) {
     if (!config_value.IsObject()) {
-        return foundation::base::Result<RabbitMqBusConfig>(
+        return foundation::base::Result<AmqpBusConfig>(
             foundation::base::ErrorCode::kParseError,
             "AMQP bus config must be an object");
     }
 
-    RabbitMqBusConfig config;
+    AmqpBusConfig config;
 
     foundation::base::Result<foundation::config::ConfigValue> connection =
         GetRequiredObjectField(config_value, "connection");
     if (!connection.IsOk()) {
-        return foundation::base::Result<RabbitMqBusConfig>(
+        return foundation::base::Result<AmqpBusConfig>(
             connection.GetError(),
             connection.GetMessage());
     }
@@ -1026,7 +1006,7 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
 
     if (!uri.IsOk() || !heartbeat.IsOk() || !connect_timeout.IsOk() ||
         !socket_timeout.IsOk() || !reconnect.IsOk()) {
-        return foundation::base::Result<RabbitMqBusConfig>(
+        return foundation::base::Result<AmqpBusConfig>(
             foundation::base::ErrorCode::kParseError,
             "Invalid connection configuration");
     }
@@ -1049,7 +1029,7 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
     if (!reconnect_enabled.IsOk() || !reconnect_initial.IsOk() ||
         !reconnect_max.IsOk() || !worker_pool.IsOk() || !thread_count.IsOk() ||
         !topology.IsOk() || !features.IsOk()) {
-        return foundation::base::Result<RabbitMqBusConfig>(
+        return foundation::base::Result<AmqpBusConfig>(
             foundation::base::ErrorCode::kParseError,
             "Invalid reconnect, worker_pool, or features configuration");
     }
@@ -1057,14 +1037,14 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
     foundation::base::Result<bool> publisher_confirms_enabled =
         GetOptionalBoolField(features.Value(), "publisher_confirm", true);
     if (!publisher_confirms_enabled.IsOk()) {
-        return foundation::base::Result<RabbitMqBusConfig>(
+        return foundation::base::Result<AmqpBusConfig>(
             foundation::base::ErrorCode::kParseError,
             "Invalid features.publisher_confirm configuration");
     }
 
     if (heartbeat.Value() < 0 ||
         heartbeat.Value() > std::numeric_limits<std::uint16_t>::max()) {
-        return foundation::base::Result<RabbitMqBusConfig>(
+        return foundation::base::Result<AmqpBusConfig>(
             foundation::base::ErrorCode::kParseError,
             "connection.heartbeat_seconds must be within uint16 range");
     }
@@ -1073,7 +1053,7 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
         reconnect_initial.Value() < 0 ||
         reconnect_max.Value() < reconnect_initial.Value() ||
         thread_count.Value() <= 0) {
-        return foundation::base::Result<RabbitMqBusConfig>(
+        return foundation::base::Result<AmqpBusConfig>(
             foundation::base::ErrorCode::kParseError,
             "Invalid timing or thread_count values in AMQP config");
     }
@@ -1107,7 +1087,7 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
 
     if (!exchanges.IsOk() || !queues.IsOk() || !bindings.IsOk() ||
         !publishers.IsOk() || !consumers.IsOk()) {
-        return foundation::base::Result<RabbitMqBusConfig>(
+        return foundation::base::Result<AmqpBusConfig>(
             foundation::base::ErrorCode::kParseError,
             "AMQP arrays must be arrays when provided");
     }
@@ -1150,7 +1130,7 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
         &parse_publishers, &parse_consumers};
     for (std::size_t index = 0; index < sizeof(results) / sizeof(results[0]); ++index) {
         if (!results[index]->IsOk()) {
-            return foundation::base::Result<RabbitMqBusConfig>(
+            return foundation::base::Result<AmqpBusConfig>(
                 results[index]->GetError(),
                 results[index]->GetMessage());
         }
@@ -1169,14 +1149,14 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
     for (std::size_t index = 0; index < config.bindings.size(); ++index) {
         const BindingSpec& binding = config.bindings[index];
         if (exchange_names.find(binding.exchange) == exchange_names.end()) {
-            return foundation::base::Result<RabbitMqBusConfig>(
+            return foundation::base::Result<AmqpBusConfig>(
                 foundation::base::ErrorCode::kParseError,
                 "Binding '" + binding.exchange + "|" + binding.queue + "|" +
                     binding.routing_key + "' references unknown exchange '" +
                     binding.exchange + "'");
         }
         if (queue_names.find(binding.queue) == queue_names.end()) {
-            return foundation::base::Result<RabbitMqBusConfig>(
+            return foundation::base::Result<AmqpBusConfig>(
                 foundation::base::ErrorCode::kParseError,
                 "Binding '" + binding.exchange + "|" + binding.queue + "|" +
                     binding.routing_key + "' references unknown queue '" +
@@ -1188,7 +1168,7 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
         const PublisherSpec& publisher = config.publishers[index];
         if (!publisher.exchange.empty() &&
             exchange_names.find(publisher.exchange) == exchange_names.end()) {
-            return foundation::base::Result<RabbitMqBusConfig>(
+            return foundation::base::Result<AmqpBusConfig>(
                 foundation::base::ErrorCode::kParseError,
                 "Publisher '" + publisher.name +
                     "' references unknown exchange '" +
@@ -1199,14 +1179,14 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
     for (std::size_t index = 0; index < config.consumers.size(); ++index) {
         const ConsumerSpec& consumer = config.consumers[index];
         if (queue_names.find(consumer.queue) == queue_names.end()) {
-            return foundation::base::Result<RabbitMqBusConfig>(
+            return foundation::base::Result<AmqpBusConfig>(
                 foundation::base::ErrorCode::kParseError,
                 "Consumer '" + consumer.name +
                     "' references unknown queue '" + consumer.queue + "'");
         }
     }
 
-    return foundation::base::Result<RabbitMqBusConfig>(config);
+    return foundation::base::Result<AmqpBusConfig>(config);
 }
 
 bool IsSameBinding(const BindingSpec& lhs, const BindingSpec& rhs) {
@@ -1425,7 +1405,7 @@ struct ConsumerRuntime {
 
 }  // namespace
 
-class RabbitMqConnectionDriver : public AMQP::ConnectionHandler,
+class AmqpConnectionDriver : public AMQP::ConnectionHandler,
                                  private foundation::base::NonCopyable {
 public:
     typedef std::function<void(
@@ -1433,9 +1413,9 @@ public:
         const DeliveryContext&)> DeliveryCallback;
 
 public:
-    RabbitMqConnectionDriver(const RabbitMqBusConfig& config,
+    AmqpConnectionDriver(const AmqpBusConfig& config,
                              DeliveryCallback delivery_callback);
-    ~RabbitMqConnectionDriver();
+    ~AmqpConnectionDriver();
 
     foundation::base::Result<void> Start();
     foundation::base::Result<void> Stop();
@@ -1508,7 +1488,7 @@ private:
                                bool redelivered);
 
 private:
-    RabbitMqBusConfig config_;
+    AmqpBusConfig config_;
     DeliveryCallback delivery_callback_;
     mutable std::mutex mutex_;
     std::thread thread_;
@@ -1536,8 +1516,8 @@ private:
     std::chrono::steady_clock::time_point last_heartbeat_sent_;
 };
 
-RabbitMqConnectionDriver::RabbitMqConnectionDriver(
-    const RabbitMqBusConfig& config,
+AmqpConnectionDriver::AmqpConnectionDriver(
+    const AmqpBusConfig& config,
     DeliveryCallback delivery_callback)
     : config_(config),
       delivery_callback_(delivery_callback),
@@ -1567,11 +1547,11 @@ RabbitMqConnectionDriver::RabbitMqConnectionDriver(
       last_heartbeat_sent_(std::chrono::steady_clock::time_point::min()) {
 }
 
-RabbitMqConnectionDriver::~RabbitMqConnectionDriver() {
+AmqpConnectionDriver::~AmqpConnectionDriver() {
     (void)Stop();
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::Start() {
+foundation::base::Result<void> AmqpConnectionDriver::Start() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (thread_.joinable()) {
         return MakeInvalidState("AMQP connection driver already started");
@@ -1582,11 +1562,11 @@ foundation::base::Result<void> RabbitMqConnectionDriver::Start() {
     last_error_.clear();
     next_reconnect_at_ = std::chrono::steady_clock::now();
     reconnect_delay_ms_ = config_.connection.reconnect.initial_delay_ms;
-    thread_ = std::thread(&RabbitMqConnectionDriver::ThreadMain, this);
+    thread_ = std::thread(&AmqpConnectionDriver::ThreadMain, this);
     return foundation::base::MakeSuccess();
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::Stop() {
+foundation::base::Result<void> AmqpConnectionDriver::Stop() {
     {
         std::lock_guard<std::mutex> lock(mutex_);
         stop_requested_ = true;
@@ -1601,7 +1581,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::Stop() {
     return foundation::base::MakeSuccess();
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::FillEnvelope(
+foundation::base::Result<void> AmqpConnectionDriver::FillEnvelope(
     const PublishRequest& request,
     AMQP::Envelope* envelope) const {
     if (envelope == NULL) {
@@ -1632,11 +1612,11 @@ foundation::base::Result<void> RabbitMqConnectionDriver::FillEnvelope(
     return foundation::base::MakeSuccess();
 }
 
-int RabbitMqConnectionDriver::PublishFlags(const PublishRequest& request) const {
+int AmqpConnectionDriver::PublishFlags(const PublishRequest& request) const {
     return request.mandatory ? AMQP::mandatory : 0;
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::Publish(
+foundation::base::Result<void> AmqpConnectionDriver::Publish(
     const PublishRequest& request) {
     foundation::base::Result<void> target_result =
         ValidatePublishTarget(request.exchange, request.routing_key);
@@ -1701,7 +1681,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::Publish(
     return WaitPendingResult(pending);
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::PublishAsync(
+foundation::base::Result<void> AmqpConnectionDriver::PublishAsync(
     const PublishRequest& request) {
     foundation::base::Result<void> target_result =
         ValidatePublishTarget(request.exchange, request.routing_key);
@@ -1763,7 +1743,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::PublishAsync(
     });
 }
 
-foundation::base::Result<PublishReceipt> RabbitMqConnectionDriver::PublishConfirmed(
+foundation::base::Result<PublishReceipt> AmqpConnectionDriver::PublishConfirmed(
     const PublishRequest& request,
     const PublishConfirmOptions& options) {
     PublishRequest effective_request = request;
@@ -1863,7 +1843,7 @@ foundation::base::Result<PublishReceipt> RabbitMqConnectionDriver::PublishConfir
     return WaitPendingPublishResult(pending, options.timeout_ms);
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::DeclareExchange(
+foundation::base::Result<void> AmqpConnectionDriver::DeclareExchange(
     const ExchangeSpec& spec) {
     if (spec.name.empty()) {
         return MakeInvalidArgument("Exchange name must not be empty");
@@ -1919,7 +1899,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::DeclareExchange(
     return WaitPendingResult(pending);
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::DeclareQueue(
+foundation::base::Result<void> AmqpConnectionDriver::DeclareQueue(
     const QueueSpec& spec) {
     if (spec.name.empty()) {
         return MakeInvalidArgument("Queue name must not be empty");
@@ -1974,7 +1954,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::DeclareQueue(
     return WaitPendingResult(pending);
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::BindQueue(
+foundation::base::Result<void> AmqpConnectionDriver::BindQueue(
     const BindingSpec& spec) {
     if (spec.exchange.empty() || spec.queue.empty()) {
         return MakeInvalidArgument(
@@ -2031,7 +2011,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::BindQueue(
     return WaitPendingResult(pending);
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::CompleteDelivery(
+foundation::base::Result<void> AmqpConnectionDriver::CompleteDelivery(
     const DeliveryContext& delivery,
     ConsumeAction action) {
     if (delivery.consumer_name.empty() || delivery.auto_ack) {
@@ -2089,7 +2069,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::CompleteDelivery(
     return WaitPendingResult(pending);
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::CompleteDeliveryAsync(
+foundation::base::Result<void> AmqpConnectionDriver::CompleteDeliveryAsync(
     const DeliveryContext& delivery,
     ConsumeAction action) {
     if (delivery.consumer_name.empty() || delivery.auto_ack) {
@@ -2138,17 +2118,17 @@ foundation::base::Result<void> RabbitMqConnectionDriver::CompleteDeliveryAsync(
     });
 }
 
-ConnectionState RabbitMqConnectionDriver::GetConnectionState() const {
+ConnectionState AmqpConnectionDriver::GetConnectionState() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return state_;
 }
 
-std::string RabbitMqConnectionDriver::LastError() const {
+std::string AmqpConnectionDriver::LastError() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return last_error_;
 }
 
-void RabbitMqConnectionDriver::onData(AMQP::Connection*,
+void AmqpConnectionDriver::onData(AMQP::Connection*,
                                       const char* data,
                                       size_t size) {
     if (data == NULL || size == 0) {
@@ -2158,29 +2138,29 @@ void RabbitMqConnectionDriver::onData(AMQP::Connection*,
     outbound_.append(data, size);
 }
 
-void RabbitMqConnectionDriver::onReady(AMQP::Connection*) {
+void AmqpConnectionDriver::onReady(AMQP::Connection*) {
     FOUNDATION_LOG_INFO("AMQP handshake completed");
     handshake_ready_ = true;
     EnablePublisherConfirms();
 }
 
-void RabbitMqConnectionDriver::onError(AMQP::Connection*,
+void AmqpConnectionDriver::onError(AMQP::Connection*,
                                        const char* message) {
     RequestDisconnect(MakeErrorMessage(
         "AMQP connection error",
         message ? message : ""));
 }
 
-void RabbitMqConnectionDriver::onClosed(AMQP::Connection*) {
+void AmqpConnectionDriver::onClosed(AMQP::Connection*) {
     RequestDisconnect("AMQP connection closed");
 }
 
-std::uint16_t RabbitMqConnectionDriver::onNegotiate(AMQP::Connection*,
+std::uint16_t AmqpConnectionDriver::onNegotiate(AMQP::Connection*,
                                                     std::uint16_t) {
     return config_.connection.heartbeat_seconds;
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::EnqueueCommand(
+foundation::base::Result<void> AmqpConnectionDriver::EnqueueCommand(
     const std::function<void()>& command) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!thread_.joinable() || stop_requested_) {
@@ -2191,7 +2171,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::EnqueueCommand(
     return foundation::base::MakeSuccess();
 }
 
-void RabbitMqConnectionDriver::ThreadMain() {
+void AmqpConnectionDriver::ThreadMain() {
     SocketSystemScope socket_scope;
     if (!socket_scope.IsOk()) {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -2244,16 +2224,16 @@ void RabbitMqConnectionDriver::ThreadMain() {
     HandleDisconnect("AMQP driver stopped");
 }
 
-bool RabbitMqConnectionDriver::ShouldStop() const {
+bool AmqpConnectionDriver::ShouldStop() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return stop_requested_;
 }
 
-void RabbitMqConnectionDriver::SleepFor(std::chrono::milliseconds duration) const {
+void AmqpConnectionDriver::SleepFor(std::chrono::milliseconds duration) const {
     std::this_thread::sleep_for(duration);
 }
 
-bool RabbitMqConnectionDriver::ShouldAttemptReconnect() {
+bool AmqpConnectionDriver::ShouldAttemptReconnect() {
     if (!config_.connection.reconnect.enabled) {
         std::lock_guard<std::mutex> lock(mutex_);
         return !stop_requested_ && state_ == ConnectionState::Connecting;
@@ -2262,7 +2242,7 @@ bool RabbitMqConnectionDriver::ShouldAttemptReconnect() {
     return std::chrono::steady_clock::now() >= next_reconnect_at_;
 }
 
-void RabbitMqConnectionDriver::ApplyReconnectBackoff(const std::string& error) {
+void AmqpConnectionDriver::ApplyReconnectBackoff(const std::string& error) {
     FOUNDATION_LOG_WARNING("AMQP connect attempt failed: " << error);
     std::lock_guard<std::mutex> lock(mutex_);
     last_error_ = error;
@@ -2277,7 +2257,7 @@ void RabbitMqConnectionDriver::ApplyReconnectBackoff(const std::string& error) {
         config_.connection.reconnect.max_delay_ms);
 }
 
-foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
+foundation::base::Result<void> AmqpConnectionDriver::ConnectSocket() {
     AMQP::Address address("amqp://guest:guest@localhost/");
     try {
         address = AMQP::Address(config_.connection.uri);
@@ -2466,7 +2446,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
     return result;
 }
 
-void RabbitMqConnectionDriver::FlushOutboundData() {
+void AmqpConnectionDriver::FlushOutboundData() {
     while (connected_ && !outbound_.empty()) {
         int sent = send(
             socket_fd_,
@@ -2490,7 +2470,7 @@ void RabbitMqConnectionDriver::FlushOutboundData() {
     }
 }
 
-void RabbitMqConnectionDriver::PumpIncomingData() {
+void AmqpConnectionDriver::PumpIncomingData() {
     if (!connected_) {
         return;
     }
@@ -2553,7 +2533,7 @@ void RabbitMqConnectionDriver::PumpIncomingData() {
     }
 }
 
-void RabbitMqConnectionDriver::MaybeSendHeartbeat() {
+void AmqpConnectionDriver::MaybeSendHeartbeat() {
     if (!connected_ || !connection_ || !handshake_ready_ ||
         config_.connection.heartbeat_seconds == 0) {
         return;
@@ -2572,7 +2552,7 @@ void RabbitMqConnectionDriver::MaybeSendHeartbeat() {
     last_heartbeat_sent_ = now;
 }
 
-void RabbitMqConnectionDriver::DrainCommands() {
+void AmqpConnectionDriver::DrainCommands() {
     std::deque<std::function<void()> > local_commands;
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -2587,19 +2567,19 @@ void RabbitMqConnectionDriver::DrainCommands() {
     }
 }
 
-bool RabbitMqConnectionDriver::IsReadyLocked() const {
+bool AmqpConnectionDriver::IsReadyLocked() const {
     return connected_ && ready_ && admin_channel_.get() != NULL &&
            publish_channel_.get() != NULL &&
            (!config_.publisher_confirms_enabled || publisher_confirms_ready_);
 }
 
-void RabbitMqConnectionDriver::RequestDisconnect(const std::string& reason) {
+void AmqpConnectionDriver::RequestDisconnect(const std::string& reason) {
     FOUNDATION_LOG_WARNING("AMQP disconnect requested: " << reason);
     pending_disconnect_ = true;
     pending_disconnect_reason_ = reason;
 }
 
-void RabbitMqConnectionDriver::HandleDisconnect(const std::string& reason) {
+void AmqpConnectionDriver::HandleDisconnect(const std::string& reason) {
     FailPendingPublishes(reason);
 
     if (connection_) {
@@ -2637,12 +2617,12 @@ void RabbitMqConnectionDriver::HandleDisconnect(const std::string& reason) {
     }
 }
 
-void RabbitMqConnectionDriver::StartBootstrap() {
+void AmqpConnectionDriver::StartBootstrap() {
     FOUNDATION_LOG_INFO("AMQP connection ready, rebuilding topology");
     BootstrapExchanges(0);
 }
 
-void RabbitMqConnectionDriver::EnablePublisherConfirms() {
+void AmqpConnectionDriver::EnablePublisherConfirms() {
     if (!publish_channel_) {
         RequestDisconnect("AMQP publisher channel is unavailable");
         return;
@@ -2687,7 +2667,7 @@ void RabbitMqConnectionDriver::EnablePublisherConfirms() {
     });
 }
 
-void RabbitMqConnectionDriver::BootstrapExchanges(std::size_t index) {
+void AmqpConnectionDriver::BootstrapExchanges(std::size_t index) {
     if (index >= config_.exchanges.size()) {
         BootstrapQueues(0);
         return;
@@ -2721,7 +2701,7 @@ void RabbitMqConnectionDriver::BootstrapExchanges(std::size_t index) {
         });
 }
 
-void RabbitMqConnectionDriver::BootstrapQueues(std::size_t index) {
+void AmqpConnectionDriver::BootstrapQueues(std::size_t index) {
     if (index >= config_.queues.size()) {
         BootstrapBindings(0);
         return;
@@ -2756,7 +2736,7 @@ void RabbitMqConnectionDriver::BootstrapQueues(std::size_t index) {
         });
 }
 
-void RabbitMqConnectionDriver::BootstrapBindings(std::size_t index) {
+void AmqpConnectionDriver::BootstrapBindings(std::size_t index) {
     if (index >= config_.bindings.size()) {
         BootstrapConsumers(0);
         return;
@@ -2792,7 +2772,7 @@ void RabbitMqConnectionDriver::BootstrapBindings(std::size_t index) {
         });
 }
 
-void RabbitMqConnectionDriver::BootstrapConsumers(std::size_t index) {
+void AmqpConnectionDriver::BootstrapConsumers(std::size_t index) {
     if (index >= config_.consumers.size()) {
         std::lock_guard<std::mutex> lock(mutex_);
         state_ = ConnectionState::Connected;
@@ -2835,7 +2815,7 @@ void RabbitMqConnectionDriver::BootstrapConsumers(std::size_t index) {
     }
 }
 
-void RabbitMqConnectionDriver::StartConsumer(std::size_t index) {
+void AmqpConnectionDriver::StartConsumer(std::size_t index) {
     const ConsumerSpec spec = config_.consumers[index];
     std::map<std::string, ConsumerRuntime>::iterator runtime_it =
         consumer_runtimes_.find(spec.name);
@@ -2886,7 +2866,7 @@ void RabbitMqConnectionDriver::StartConsumer(std::size_t index) {
         });
 }
 
-void RabbitMqConnectionDriver::CompletePublishConfirm(
+void AmqpConnectionDriver::CompletePublishConfirm(
     std::uint64_t delivery_tag,
     bool multiple,
     PublishDisposition disposition,
@@ -2934,7 +2914,7 @@ void RabbitMqConnectionDriver::CompletePublishConfirm(
     }
 }
 
-void RabbitMqConnectionDriver::FailPendingPublishes(const std::string& reason) {
+void AmqpConnectionDriver::FailPendingPublishes(const std::string& reason) {
     if (pending_publish_confirms_.empty()) {
         return;
     }
@@ -2957,7 +2937,7 @@ void RabbitMqConnectionDriver::FailPendingPublishes(const std::string& reason) {
     }
 }
 
-bool RabbitMqConnectionDriver::MarkReturnedPublish(
+bool AmqpConnectionDriver::MarkReturnedPublish(
     const AMQP::Message& message,
     int16_t code,
     const std::string& description) {
@@ -3005,7 +2985,7 @@ bool RabbitMqConnectionDriver::MarkReturnedPublish(
     return false;
 }
 
-void RabbitMqConnectionDriver::HandleReturnedMessage(
+void AmqpConnectionDriver::HandleReturnedMessage(
     const AMQP::Message& message,
     int16_t code,
     const std::string& description) {
@@ -3022,7 +3002,7 @@ void RabbitMqConnectionDriver::HandleReturnedMessage(
         << ", code=" << code << ", description=" << description);
 }
 
-void RabbitMqConnectionDriver::HandleIncomingMessage(
+void AmqpConnectionDriver::HandleIncomingMessage(
     const ConsumerSpec& spec,
     const AMQP::Message& message,
     std::uint64_t delivery_tag,
@@ -3069,7 +3049,7 @@ void RabbitMqConnectionDriver::HandleIncomingMessage(
 }
 
 foundation::base::Result<void> PublishWithDriver(
-    const std::shared_ptr<RabbitMqConnectionDriver>& driver,
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
     const PublishRequest& request) {
     if (!driver) {
         return MakeDisconnected("AMQP bus module is not started");
@@ -3079,7 +3059,7 @@ foundation::base::Result<void> PublishWithDriver(
 }
 
 foundation::base::Result<void> PublishAsyncWithDriver(
-    const std::shared_ptr<RabbitMqConnectionDriver>& driver,
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
     const PublishRequest& request) {
     if (!driver) {
         return MakeDisconnected("AMQP bus module is not started");
@@ -3089,7 +3069,7 @@ foundation::base::Result<void> PublishAsyncWithDriver(
 }
 
 foundation::base::Result<PublishReceipt> PublishConfirmedWithDriver(
-    const std::shared_ptr<RabbitMqConnectionDriver>& driver,
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
     const PublishRequest& request,
     const PublishConfirmOptions& options) {
     if (!driver) {
@@ -3102,7 +3082,7 @@ foundation::base::Result<PublishReceipt> PublishConfirmedWithDriver(
 }
 
 foundation::base::Result<void> DeclareExchangeWithDriver(
-    const std::shared_ptr<RabbitMqConnectionDriver>& driver,
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
     const ExchangeSpec& spec) {
     if (!driver) {
         return MakeDisconnected("AMQP bus module is not started");
@@ -3112,7 +3092,7 @@ foundation::base::Result<void> DeclareExchangeWithDriver(
 }
 
 foundation::base::Result<void> DeclareQueueWithDriver(
-    const std::shared_ptr<RabbitMqConnectionDriver>& driver,
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
     const QueueSpec& spec) {
     if (!driver) {
         return MakeDisconnected("AMQP bus module is not started");
@@ -3122,7 +3102,7 @@ foundation::base::Result<void> DeclareQueueWithDriver(
 }
 
 foundation::base::Result<void> BindQueueWithDriver(
-    const std::shared_ptr<RabbitMqConnectionDriver>& driver,
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
     const BindingSpec& spec) {
     if (!driver) {
         return MakeDisconnected("AMQP bus module is not started");
@@ -3132,7 +3112,7 @@ foundation::base::Result<void> BindQueueWithDriver(
 }
 
 ConnectionState GetConnectionStateFromDriver(
-    const std::shared_ptr<RabbitMqConnectionDriver>& driver) {
+    const std::shared_ptr<AmqpConnectionDriver>& driver) {
     if (!driver) {
         return ConnectionState::Created;
     }
@@ -3141,7 +3121,7 @@ ConnectionState GetConnectionStateFromDriver(
 }
 
 bool SupportsFeatureFromDriver(
-    const std::shared_ptr<RabbitMqConnectionDriver>&,
+    const std::shared_ptr<AmqpConnectionDriver>&,
     MessageBusFeature feature) {
     switch (feature) {
         case MessageBusFeature::PublisherConfirm:
@@ -3152,293 +3132,46 @@ bool SupportsFeatureFromDriver(
     }
 }
 
-RabbitMqBusModule::RabbitMqBusModule()
-    : shared_state_(new RabbitMqBusSharedState()),
-      service_proxy_(new MessageBusServiceProxy(shared_state_)) {
+foundation::base::Result<AmqpBusConfig> ParseAmqpBusConfig(
+    const foundation::config::ConfigValue& config_value) {
+    return ParseBusConfig(config_value);
 }
 
-RabbitMqBusModule::~RabbitMqBusModule() {
+std::shared_ptr<AmqpConnectionDriver> CreateAmqpConnectionDriver(
+    const AmqpBusConfig& config,
+    DeliveryCallback delivery_callback) {
+    return std::shared_ptr<AmqpConnectionDriver>(
+        new AmqpConnectionDriver(config, delivery_callback));
 }
 
-std::string RabbitMqBusModule::ModuleType() const {
-    return "amqp_bus";
-}
-
-std::vector<std::string> RabbitMqBusModule::ModuleTypeAliases() const {
-    std::vector<std::string> aliases;
-    aliases.push_back("rabbitmq_bus");
-    return aliases;
-}
-
-std::string RabbitMqBusModule::ModuleVersion() const {
-    return "1.0.0";
-}
-
-foundation::base::Result<void> RabbitMqBusModule::Publish(
-    const PublishRequest& request) {
-    return service_proxy_->Publish(request);
-}
-
-foundation::base::Result<void> RabbitMqBusModule::PublishAsync(
-    const PublishRequest& request) {
-    return service_proxy_->PublishAsync(request);
-}
-
-foundation::base::Result<PublishReceipt> RabbitMqBusModule::PublishConfirmed(
-    const PublishRequest& request,
-    const PublishConfirmOptions& options) {
-    return service_proxy_->PublishConfirmed(request, options);
-}
-
-foundation::base::Result<void> RabbitMqBusModule::RegisterConsumerHandler(
-    const std::string& consumer_name,
-    MessageHandler handler) {
-    return service_proxy_->RegisterConsumerHandler(consumer_name, handler);
-}
-
-foundation::base::Result<void> RabbitMqBusModule::UnregisterConsumerHandler(
-    const std::string& consumer_name) {
-    return service_proxy_->UnregisterConsumerHandler(consumer_name);
-}
-
-foundation::base::Result<void> RabbitMqBusModule::DeclareExchange(
-    const ExchangeSpec& spec) {
-    return service_proxy_->DeclareExchange(spec);
-}
-
-foundation::base::Result<void> RabbitMqBusModule::DeclareQueue(
-    const QueueSpec& spec) {
-    return service_proxy_->DeclareQueue(spec);
-}
-
-foundation::base::Result<void> RabbitMqBusModule::BindQueue(
-    const BindingSpec& spec) {
-    return service_proxy_->BindQueue(spec);
-}
-
-ConnectionState RabbitMqBusModule::GetConnectionState() const {
-    return service_proxy_->GetConnectionState();
-}
-
-bool RabbitMqBusModule::SupportsFeature(MessageBusFeature feature) const {
-    return service_proxy_->SupportsFeature(feature);
-}
-
-foundation::base::Result<void> RabbitMqBusModule::OnInit() {
-    module_context::framework::IModuleManager* manager = Context().ModuleManager();
-    if (manager == NULL) {
-        return foundation::base::Result<void>(
-            foundation::base::ErrorCode::kInvalidState,
-            "Module manager is unavailable");
+foundation::base::Result<void> StartDriver(
+    const std::shared_ptr<AmqpConnectionDriver>& driver) {
+    if (!driver) {
+        return MakeDisconnected("AMQP bus module is not started");
     }
 
-    foundation::base::Result<foundation::config::ConfigValue> config =
-        manager->ModuleConfig(ModuleName());
-    if (!config.IsOk()) {
-        return foundation::base::Result<void>(
-            config.GetError(),
-            config.GetMessage());
-    }
-
-    foundation::base::Result<RabbitMqBusConfig> parsed =
-        ParseBusConfig(config.Value());
-    if (!parsed.IsOk()) {
-        return foundation::base::Result<void>(
-            parsed.GetError(),
-            parsed.GetMessage());
-    }
-
-    std::shared_ptr<RabbitMqBusConfig> parsed_config(
-        new RabbitMqBusConfig(parsed.Value()));
-    std::shared_ptr<foundation::concurrent::ThreadPool> worker_pool(
-        new foundation::concurrent::ThreadPool(parsed_config->worker_thread_count));
-    {
-        std::lock_guard<std::mutex> lock(shared_state_->mutex);
-        shared_state_->config = parsed_config;
-        shared_state_->handlers.clear();
-        shared_state_->worker_pool = worker_pool;
-        shared_state_->driver.reset();
-        shared_state_->stopping = false;
-    }
-
-    return foundation::base::MakeSuccess();
+    return driver->Start();
 }
 
-foundation::base::Result<void> RabbitMqBusModule::OnStart() {
-    std::shared_ptr<RabbitMqBusConfig> config;
-    std::shared_ptr<foundation::concurrent::ThreadPool> worker_pool;
-    {
-        std::lock_guard<std::mutex> lock(shared_state_->mutex);
-        shared_state_->stopping = false;
-        config = shared_state_->config;
-        if (config &&
-            (!shared_state_->worker_pool ||
-             shared_state_->worker_pool->IsStopped())) {
-            shared_state_->worker_pool.reset(
-                new foundation::concurrent::ThreadPool(
-                    config->worker_thread_count));
-        }
-        worker_pool = shared_state_->worker_pool;
+foundation::base::Result<void> StopDriver(
+    const std::shared_ptr<AmqpConnectionDriver>& driver) {
+    if (!driver) {
+        return foundation::base::MakeSuccess();
     }
 
-    if (!worker_pool) {
-        return MakeInvalidState("AMQP bus module is not initialized");
-    }
-    if (!config) {
-        return MakeInvalidState("AMQP bus configuration is unavailable");
-    }
-
-    foundation::base::Result<void> pool_start = worker_pool->Start();
-    if (!pool_start.IsOk()) {
-        return pool_start;
-    }
-
-    std::shared_ptr<RabbitMqBusSharedState> state = shared_state_;
-    std::shared_ptr<RabbitMqConnectionDriver> driver(
-        new RabbitMqConnectionDriver(
-            *config,
-            [state](const IncomingMessage& incoming,
-                    const DeliveryContext& delivery) {
-                MessageHandler handler;
-                std::shared_ptr<RabbitMqConnectionDriver> driver_ref;
-                std::shared_ptr<foundation::concurrent::ThreadPool> worker_pool_ref;
-                bool stopping = false;
-                {
-                    std::lock_guard<std::mutex> lock(state->mutex);
-                    stopping = state->stopping;
-                    std::map<std::string, MessageHandler>::iterator it =
-                        state->handlers.find(incoming.consumer_name);
-                    if (it != state->handlers.end()) {
-                        handler = it->second;
-                    }
-                    driver_ref = state->driver;
-                    worker_pool_ref = state->worker_pool;
-                }
-
-                if (stopping) {
-                    if (!delivery.auto_ack && driver_ref) {
-                        LogResultIfError(
-                            driver_ref->CompleteDeliveryAsync(
-                                delivery,
-                                ConsumeAction::Requeue),
-                            "Requeue message because AMQP bus is stopping");
-                    }
-                    return;
-                }
-
-                if (!worker_pool_ref) {
-                    if (!delivery.auto_ack && driver_ref) {
-                        LogResultIfError(
-                            driver_ref->CompleteDeliveryAsync(
-                                delivery,
-                                ConsumeAction::Requeue),
-                            "Requeue message because worker pool is unavailable");
-                    }
-                    return;
-                }
-
-                foundation::base::Result<std::future<void> > submitted =
-                    worker_pool_ref->Submit(
-                        [incoming, delivery, handler, driver_ref]() {
-                            ConsumeAction action = ConsumeAction::Requeue;
-                            if (handler) {
-                                try {
-                                    action = handler(incoming);
-                                } catch (...) {
-                                    FOUNDATION_LOG_ERROR(
-                                        "Message handler for consumer '"
-                                        << incoming.consumer_name
-                                        << "' threw an exception");
-                                    action = ConsumeAction::Requeue;
-                                }
-                            } else {
-                                FOUNDATION_LOG_WARNING(
-                                    "No message handler registered for consumer '"
-                                    << incoming.consumer_name
-                                    << "', requeueing message");
-                            }
-
-                            if (!delivery.auto_ack && driver_ref) {
-                                LogResultIfError(
-                                    driver_ref->CompleteDeliveryAsync(delivery, action),
-                                    "Failed to complete delivery for consumer '" +
-                                        incoming.consumer_name + "'");
-                            }
-                        });
-
-                if (!submitted.IsOk() && !delivery.auto_ack && driver_ref) {
-                    LogResultIfError(
-                        driver_ref->CompleteDeliveryAsync(
-                            delivery,
-                            ConsumeAction::Requeue),
-                        "Requeue message because worker task submission failed");
-                }
-            }));
-
-    {
-        std::lock_guard<std::mutex> lock(shared_state_->mutex);
-        shared_state_->driver = driver;
-    }
-
-    foundation::base::Result<void> start_result = driver->Start();
-    if (!start_result.IsOk()) {
-        {
-            std::lock_guard<std::mutex> lock(shared_state_->mutex);
-            shared_state_->driver.reset();
-        }
-        (void)worker_pool->ShutdownNow();
-        return start_result;
-    }
-
-    return foundation::base::MakeSuccess();
+    return driver->Stop();
 }
 
-foundation::base::Result<void> RabbitMqBusModule::OnStop() {
-    foundation::base::Result<void> first_error = foundation::base::MakeSuccess();
-    std::shared_ptr<RabbitMqConnectionDriver> driver;
-    std::shared_ptr<foundation::concurrent::ThreadPool> worker_pool;
-    {
-        std::lock_guard<std::mutex> lock(shared_state_->mutex);
-        shared_state_->stopping = true;
-        driver = shared_state_->driver;
-        worker_pool = shared_state_->worker_pool;
+foundation::base::Result<void> CompleteDeliveryAsyncWithDriver(
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
+    const DeliveryContext& delivery,
+    ConsumeAction action) {
+    if (!driver) {
+        return MakeDisconnected("AMQP bus module is not started");
     }
 
-    // 先等待已提交的业务 handler 结束，再停止 AMQP driver。这样 handler 返回后
-    // 仍有机会通过 driver 发送 ACK/NACK，降低停止过程中的重复投递风险。
-    if (worker_pool) {
-        foundation::base::Result<void> pool_result = worker_pool->Shutdown();
-        if (first_error.IsOk() && !pool_result.IsOk()) {
-            first_error = pool_result;
-        }
-    }
-
-    if (driver) {
-        foundation::base::Result<void> stop_result = driver->Stop();
-        if (first_error.IsOk() && !stop_result.IsOk()) {
-            first_error = stop_result;
-        }
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(shared_state_->mutex);
-        shared_state_->handlers.clear();
-    }
-
-    return first_error;
+    return driver->CompleteDeliveryAsync(delivery, action);
 }
-
-foundation::base::Result<void> RabbitMqBusModule::OnFini() {
-    std::lock_guard<std::mutex> lock(shared_state_->mutex);
-    shared_state_->stopping = false;
-    shared_state_->handlers.clear();
-    shared_state_->driver.reset();
-    shared_state_->worker_pool.reset();
-    shared_state_->config.reset(new RabbitMqBusConfig());
-    return foundation::base::MakeSuccess();
-}
-
-MC_DECLARE_MODULE_FACTORY(RabbitMqBusModule)
 
 }  // namespace messaging
 }  // namespace module_context

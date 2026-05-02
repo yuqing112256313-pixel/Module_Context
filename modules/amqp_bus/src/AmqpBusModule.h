@@ -12,27 +12,24 @@
 namespace module_context {
 namespace messaging {
 
-struct RabbitMqBusSharedState;
+struct AmqpBusSharedState;
 class MessageBusServiceProxy;
 
 /**
- * @brief AMQP 消息总线模块的 AMQP-CPP 实现。
+ * @brief AMQP 消息总线模块的框架外壳。
  *
  * 模块本体负责框架生命周期和配置装载，`IMessageBusService` 的实际调用路径
  * 委托给 `MessageBusServiceProxy`。这样服务能力可以通过共享状态访问当前驱动，
- * 而不把连接线程、worker pool 和模块状态机直接暴露给调用方。标准模块类型为
- * `amqp_bus`，`rabbitmq_bus` 仅作为历史配置别名保留。
+ * 而不把连接线程、worker pool 和模块状态机直接暴露给调用方。
  */
-class RabbitMqBusModule final
+class AmqpBusModule final
     : public module_context::framework::ModuleBase,
-      public module_context::framework::IModuleTypeMetadata,
       public IMessageBusService {
 public:
-    RabbitMqBusModule();
-    ~RabbitMqBusModule() override;
+    AmqpBusModule();
+    ~AmqpBusModule() override;
 
     std::string ModuleType() const override;
-    std::vector<std::string> ModuleTypeAliases() const override;
     std::string ModuleVersion() const override;
 
     foundation::base::Result<void> Publish(
@@ -64,7 +61,7 @@ protected:
 
 private:
     // 模块、proxy、连接驱动和 worker 回调之间共享的运行态状态。
-    std::shared_ptr<RabbitMqBusSharedState> shared_state_;
+    std::shared_ptr<AmqpBusSharedState> shared_state_;
     // 服务方法的稳定转发层；模块生命周期重建 driver 时，proxy 指针保持不变。
     std::unique_ptr<MessageBusServiceProxy> service_proxy_;
 };

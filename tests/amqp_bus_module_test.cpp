@@ -1,4 +1,4 @@
-#include "RabbitMqBusModule.h"
+#include "AmqpBusModule.h"
 
 #include "module_context/framework/IContext.h"
 #include "module_context/framework/IModuleManager.h"
@@ -12,7 +12,6 @@
 #include <iostream>
 #include <string>
 #include <thread>
-#include <vector>
 
 namespace {
 
@@ -24,7 +23,7 @@ using module_context::messaging::IMessageBusService;
 using module_context::messaging::MessageBusFeature;
 using module_context::messaging::PublishRequest;
 using module_context::messaging::PublishConfirmOptions;
-using module_context::messaging::RabbitMqBusModule;
+using module_context::messaging::AmqpBusModule;
 
 bool Expect(bool condition, const std::string& message) {
     if (!condition) {
@@ -91,7 +90,7 @@ ConfigValue MakeConsumer(const std::string& name,
     return consumer;
 }
 
-ConfigValue MakeRabbitMqConfig(bool invalid_reference) {
+ConfigValue MakeAmqpConfig(bool invalid_reference) {
     ConfigValue root = ConfigValue::MakeObject();
 
     ConfigValue connection = ConfigValue::MakeObject();
@@ -181,7 +180,7 @@ public:
 
     foundation::base::Result<ConfigValue> ModuleConfig(
         const std::string& name) override {
-        if (name != "amqp_bus" && name != "rabbitmq_bus") {
+        if (name != "amqp_bus") {
             return foundation::base::Result<ConfigValue>(
                 foundation::base::ErrorCode::kNotFound,
                 "Unknown module config");
@@ -247,17 +246,17 @@ private:
 };
 
 bool RunLifecycleCase() {
-    DummyModuleManager manager(MakeRabbitMqConfig(false));
+    DummyModuleManager manager(MakeAmqpConfig(false));
     DummyContext context(&manager);
-    RabbitMqBusModule module;
+    AmqpBusModule module;
     IMessageBusService* bus_api = &module;
 
-    if (!Expect(bus_api != NULL, "RabbitMqBusModule should expose IMessageBusService")) {
+    if (!Expect(bus_api != NULL, "AmqpBusModule should expose IMessageBusService")) {
         return false;
     }
 
     foundation::base::Result<void> init_result = module.Init(context);
-    if (!Expect(init_result.IsOk(), "RabbitMqBusModule Init should succeed")) {
+    if (!Expect(init_result.IsOk(), "AmqpBusModule Init should succeed")) {
         return false;
     }
 
@@ -293,14 +292,7 @@ bool RunLifecycleCase() {
     }
 
     if (!Expect(module.ModuleType() == "amqp_bus",
-                "RabbitMqBusModule should expose the platform ModuleType")) {
-        return false;
-    }
-
-    std::vector<std::string> aliases = module.ModuleTypeAliases();
-    if (!Expect(
-            aliases.size() == 1 && aliases[0] == "rabbitmq_bus",
-            "RabbitMqBusModule should keep rabbitmq_bus as a legacy type alias")) {
+                "AmqpBusModule should expose the platform ModuleType")) {
         return false;
     }
 
@@ -361,7 +353,7 @@ bool RunLifecycleCase() {
     }
 
     foundation::base::Result<void> start_result = module.Start();
-    if (!Expect(start_result.IsOk(), "RabbitMqBusModule Start should succeed")) {
+    if (!Expect(start_result.IsOk(), "AmqpBusModule Start should succeed")) {
         return false;
     }
 
@@ -406,24 +398,24 @@ bool RunLifecycleCase() {
     }
 
     foundation::base::Result<void> stop_result = module.Stop();
-    if (!Expect(stop_result.IsOk(), "RabbitMqBusModule Stop should succeed")) {
+    if (!Expect(stop_result.IsOk(), "AmqpBusModule Stop should succeed")) {
         return false;
     }
 
     foundation::base::Result<void> restart_result = module.Start();
-    if (!Expect(restart_result.IsOk(), "RabbitMqBusModule should restart after Stop")) {
+    if (!Expect(restart_result.IsOk(), "AmqpBusModule should restart after Stop")) {
         return false;
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(60));
 
     foundation::base::Result<void> second_stop_result = module.Stop();
-    if (!Expect(second_stop_result.IsOk(), "RabbitMqBusModule second Stop should succeed")) {
+    if (!Expect(second_stop_result.IsOk(), "AmqpBusModule second Stop should succeed")) {
         return false;
     }
 
     foundation::base::Result<void> fini_result = module.Fini();
-    if (!Expect(fini_result.IsOk(), "RabbitMqBusModule Fini should succeed")) {
+    if (!Expect(fini_result.IsOk(), "AmqpBusModule Fini should succeed")) {
         return false;
     }
 
@@ -431,15 +423,15 @@ bool RunLifecycleCase() {
 }
 
 bool RunInvalidReferenceCase() {
-    DummyModuleManager manager(MakeRabbitMqConfig(true));
+    DummyModuleManager manager(MakeAmqpConfig(true));
     DummyContext context(&manager);
-    RabbitMqBusModule module;
+    AmqpBusModule module;
 
     foundation::base::Result<void> init_result = module.Init(context);
     return Expect(
         !init_result.IsOk() &&
             init_result.GetError() == foundation::base::ErrorCode::kParseError,
-        "RabbitMqBusModule should reject configs with invalid topology references");
+        "AmqpBusModule should reject configs with invalid topology references");
 }
 
 }  // namespace
@@ -452,6 +444,6 @@ int main() {
         return 1;
     }
 
-    std::cout << "[PASSED] rabbitmq_bus_module_test" << std::endl;
+    std::cout << "[PASSED] amqp_bus_module_test" << std::endl;
     return 0;
 }

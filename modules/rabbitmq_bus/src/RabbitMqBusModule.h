@@ -14,6 +14,13 @@ namespace messaging {
 struct RabbitMqBusSharedState;
 class MessageBusServiceProxy;
 
+/**
+ * @brief AMQP 消息总线模块的 RabbitMQ/AMQP-CPP 实现。
+ *
+ * 模块本体负责框架生命周期和配置装载，`IMessageBusService` 的实际调用路径
+ * 委托给 `MessageBusServiceProxy`。这样服务能力可以通过共享状态访问当前驱动，
+ * 而不把连接线程、worker pool 和模块状态机直接暴露给调用方。
+ */
 class RabbitMqBusModule final
     : public module_context::framework::ModuleBase,
       public IMessageBusService {
@@ -48,7 +55,9 @@ protected:
     foundation::base::Result<void> OnFini() override;
 
 private:
+    // 模块、proxy、连接驱动和 worker 回调之间共享的运行态状态。
     std::shared_ptr<RabbitMqBusSharedState> shared_state_;
+    // 服务方法的稳定转发层；模块生命周期重建 driver 时，proxy 指针保持不变。
     std::unique_ptr<MessageBusServiceProxy> service_proxy_;
 };
 

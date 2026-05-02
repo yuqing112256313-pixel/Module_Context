@@ -11,6 +11,8 @@ namespace messaging {
 
 class RabbitMqConnectionDriver;
 
+// DriverOps 是 proxy 与 cpp 内部连接驱动之间的窄桥接层。连接驱动类型不暴露到
+// 公开头文件，proxy 也不需要知道 AMQP-CPP 的具体类。
 foundation::base::Result<void> PublishWithDriver(
     const std::shared_ptr<RabbitMqConnectionDriver>& driver,
     const PublishRequest& request);

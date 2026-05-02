@@ -129,6 +129,7 @@ ConfigValue MakeRabbitMqConfig(bool invalid_reference) {
 
     ConfigValue publishers = ConfigValue::MakeArray();
     AppendValue(&publishers, MakePublisher("task_publisher", "task.exchange", "task.run"));
+    AppendValue(&publishers, MakePublisher("default_exchange_publisher", "", "task.queue"));
     SetField(&root, "publishers", publishers);
 
     ConfigValue consumers = ConfigValue::MakeArray();
@@ -317,6 +318,19 @@ bool RunLifecycleCase() {
         return false;
     }
 
+    PublishRequest default_exchange_request;
+    default_exchange_request.routing_key = "task.queue";
+    default_exchange_request.payload.push_back('d');
+    foundation::base::Result<void> default_publish_before_start =
+        bus_api->Publish(default_exchange_request);
+    if (!Expect(
+            !default_publish_before_start.IsOk() &&
+                default_publish_before_start.GetError() ==
+                    foundation::base::ErrorCode::kDisconnected,
+            "Publish through AMQP default exchange should be accepted by validation")) {
+        return false;
+    }
+
     foundation::base::Result<void> start_result = module.Start();
     if (!Expect(start_result.IsOk(), "RabbitMqBusModule Start should succeed")) {
         return false;
@@ -353,6 +367,18 @@ bool RunLifecycleCase() {
 
     foundation::base::Result<void> stop_result = module.Stop();
     if (!Expect(stop_result.IsOk(), "RabbitMqBusModule Stop should succeed")) {
+        return false;
+    }
+
+    foundation::base::Result<void> restart_result = module.Start();
+    if (!Expect(restart_result.IsOk(), "RabbitMqBusModule should restart after Stop")) {
+        return false;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(60));
+
+    foundation::base::Result<void> second_stop_result = module.Stop();
+    if (!Expect(second_stop_result.IsOk(), "RabbitMqBusModule second Stop should succeed")) {
         return false;
     }
 

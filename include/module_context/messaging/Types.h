@@ -12,6 +12,9 @@
 namespace module_context {
 namespace messaging {
 
+/**
+ * @brief AMQP 交换机类型。
+ */
 enum class ExchangeType {
     Direct = 0,
     Fanout = 1,
@@ -19,12 +22,24 @@ enum class ExchangeType {
     Headers = 3
 };
 
+/**
+ * @brief 消费回调对一条消息的处置结果。
+ *
+ * `Ack` 表示处理成功；`Requeue` 表示拒绝并要求 broker 重新投递；
+ * `Reject` 表示拒绝且不要求重新入队。开启 `ConsumerSpec::auto_ack` 时，
+ * 该返回值不会再触发显式确认。
+ */
 enum class ConsumeAction {
     Ack = 0,
     Requeue = 1,
     Reject = 2
 };
 
+/**
+ * @brief 消息总线连接状态。
+ *
+ * 状态描述模块内部 AMQP 连接驱动的运行阶段，不代表 broker 集群健康度。
+ */
 enum class ConnectionState {
     Created = 0,
     Connecting = 1,
@@ -34,6 +49,9 @@ enum class ConnectionState {
     Error = 5
 };
 
+/**
+ * @brief 交换机声明参数。
+ */
 struct MC_FRAMEWORK_API ExchangeSpec {
     std::string name;
     ExchangeType type;
@@ -54,6 +72,9 @@ struct MC_FRAMEWORK_API ExchangeSpec {
     }
 };
 
+/**
+ * @brief 队列声明参数。
+ */
 struct MC_FRAMEWORK_API QueueSpec {
     std::string name;
     bool durable;
@@ -72,6 +93,9 @@ struct MC_FRAMEWORK_API QueueSpec {
     }
 };
 
+/**
+ * @brief 队列绑定参数。
+ */
 struct MC_FRAMEWORK_API BindingSpec {
     std::string exchange;
     std::string queue;
@@ -79,6 +103,9 @@ struct MC_FRAMEWORK_API BindingSpec {
     foundation::config::ConfigValue::Object arguments;
 };
 
+/**
+ * @brief 消费者启动参数。
+ */
 struct MC_FRAMEWORK_API ConsumerSpec {
     std::string name;
     std::string queue;
@@ -101,6 +128,12 @@ struct MC_FRAMEWORK_API ConsumerSpec {
     }
 };
 
+/**
+ * @brief 发布请求。
+ *
+ * `exchange` 为空时表示 AMQP 默认交换机，此时 `routing_key` 应为目标队列名。
+ * 对 fanout 等不使用 routing key 的交换机，`routing_key` 可以为空。
+ */
 struct MC_FRAMEWORK_API PublishRequest {
     std::string exchange;
     std::string routing_key;
@@ -125,6 +158,9 @@ struct MC_FRAMEWORK_API PublishRequest {
     }
 };
 
+/**
+ * @brief 传递给消费者回调的入站消息。
+ */
 struct MC_FRAMEWORK_API IncomingMessage {
     std::string consumer_name;
     std::string exchange;
@@ -149,6 +185,9 @@ struct MC_FRAMEWORK_API IncomingMessage {
     }
 };
 
+/**
+ * @brief 消息处理回调。
+ */
 typedef std::function<ConsumeAction(const IncomingMessage&)> MessageHandler;
 
 }  // namespace messaging

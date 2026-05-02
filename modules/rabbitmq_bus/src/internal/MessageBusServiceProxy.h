@@ -10,6 +10,12 @@ namespace messaging {
 
 struct RabbitMqBusSharedState;
 
+/**
+ * @brief `IMessageBusService` 的运行态代理。
+ *
+ * proxy 的存在是为了把“能力接口对象”与“模块对象/连接驱动对象”分开：
+ * 调用方拿到的服务能力稳定不变，底层 driver 可以随 Start/Stop 或重连重建。
+ */
 class MessageBusServiceProxy : public IMessageBusService {
 public:
     explicit MessageBusServiceProxy(
@@ -34,6 +40,7 @@ public:
     ConnectionState GetConnectionState() const override;
 
 private:
+    // 不拥有具体 driver，只持有共享状态以便每次调用查找当前 driver。
     std::shared_ptr<RabbitMqBusSharedState> state_;
 };
 

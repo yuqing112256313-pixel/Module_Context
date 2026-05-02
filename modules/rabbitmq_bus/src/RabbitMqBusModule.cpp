@@ -134,6 +134,18 @@ foundation::base::Result<void> MakeDisconnected(const std::string& message) {
         message);
 }
 
+foundation::base::Result<void> ValidatePublishTarget(
+    const std::string& exchange,
+    const std::string& routing_key) {
+    if (exchange.empty() && routing_key.empty()) {
+        return MakeInvalidArgument(
+            "Publish requires exchange or routing_key; "
+            "AMQP default exchange requires routing_key as queue name");
+    }
+
+    return foundation::base::MakeSuccess();
+}
+
 void CompletePendingResult(
     const std::shared_ptr<PendingResult>& result,
     const foundation::base::Result<void>& value) {
@@ -457,6 +469,8 @@ foundation::base::Result<foundation::config::ConfigValue> AmqpFieldToConfigValue
 
 foundation::base::Result<std::unique_ptr<AMQP::Field> > ConfigValueToAmqpField(
     const foundation::config::ConfigValue& value) {
+    // 配置中的 arguments/headers 使用框架通用 ConfigValue 表达。这里集中转换成
+    // AMQP table field，避免调用方或配置解析层直接依赖 AMQP-CPP 类型。
     switch (value.GetType()) {
         case foundation::config::ConfigValue::Type::kNull:
             return foundation::base::Result<std::unique_ptr<AMQP::Field> >(
@@ -773,7 +787,7 @@ foundation::base::Result<PublisherSpec> ParsePublisherSpec(
     foundation::base::Result<std::string> name =
         GetRequiredStringField(value, "name");
     foundation::base::Result<std::string> exchange =
-        GetRequiredStringField(value, "exchange");
+        GetOptionalStringField(value, "exchange", "");
     foundation::base::Result<std::string> routing_key =
         GetOptionalStringField(value, "routing_key", "");
     foundation::base::Result<std::string> content_type =
@@ -788,6 +802,14 @@ foundation::base::Result<PublisherSpec> ParsePublisherSpec(
         return foundation::base::Result<PublisherSpec>(
             foundation::base::ErrorCode::kParseError,
             "Invalid publisher specification");
+    }
+
+    foundation::base::Result<void> target_result =
+        ValidatePublishTarget(exchange.Value(), routing_key.Value());
+    if (!target_result.IsOk()) {
+        return foundation::base::Result<PublisherSpec>(
+            target_result.GetError(),
+            target_result.GetMessage());
     }
 
     PublisherSpec spec;
@@ -1074,7 +1096,8 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
 
     for (std::size_t index = 0; index < config.publishers.size(); ++index) {
         const PublisherSpec& publisher = config.publishers[index];
-        if (exchange_names.find(publisher.exchange) == exchange_names.end()) {
+        if (!publisher.exchange.empty() &&
+            exchange_names.find(publisher.exchange) == exchange_names.end()) {
             return foundation::base::Result<RabbitMqBusConfig>(
                 foundation::base::ErrorCode::kParseError,
                 "Publisher '" + publisher.name +
@@ -1506,8 +1529,10 @@ int RabbitMqConnectionDriver::PublishFlags(const PublishRequest& request) const 
 
 foundation::base::Result<void> RabbitMqConnectionDriver::Publish(
     const PublishRequest& request) {
-    if (request.exchange.empty()) {
-        return MakeInvalidArgument("Publish.exchange must not be empty");
+    foundation::base::Result<void> target_result =
+        ValidatePublishTarget(request.exchange, request.routing_key);
+    if (!target_result.IsOk()) {
+        return target_result;
     }
 
     std::shared_ptr<PendingResult> pending(new PendingResult());
@@ -1566,8 +1591,10 @@ foundation::base::Result<void> RabbitMqConnectionDriver::Publish(
 
 foundation::base::Result<void> RabbitMqConnectionDriver::PublishAsync(
     const PublishRequest& request) {
-    if (request.exchange.empty()) {
-        return MakeInvalidArgument("Publish.exchange must not be empty");
+    foundation::base::Result<void> target_result =
+        ValidatePublishTarget(request.exchange, request.routing_key);
+    if (!target_result.IsOk()) {
+        return target_result;
     }
 
     {
@@ -1575,7 +1602,9 @@ foundation::base::Result<void> RabbitMqConnectionDriver::PublishAsync(
         if (!thread_.joinable() || stop_requested_) {
             return MakeInvalidState("RabbitMQ connection driver is not running");
         }
-        if (state_ != ConnectionState::Connected || !IsReadyLocked()) {
+        // 这里只读取受 mutex_ 保护的连接状态，避免从调用线程直接读取 AMQP channel
+        // 指针等驱动线程字段。真正发布前还会在驱动线程中再次检查 IsReadyLocked()。
+        if (state_ != ConnectionState::Connected) {
             return MakeDisconnected("RabbitMQ connection is not ready");
         }
     }
@@ -2809,6 +2838,13 @@ foundation::base::Result<void> RabbitMqBusModule::OnStart() {
         std::lock_guard<std::mutex> lock(shared_state_->mutex);
         shared_state_->stopping = false;
         config = shared_state_->config;
+        if (config &&
+            (!shared_state_->worker_pool ||
+             shared_state_->worker_pool->IsStopped())) {
+            shared_state_->worker_pool.reset(
+                new foundation::concurrent::ThreadPool(
+                    config->worker_thread_count));
+        }
         worker_pool = shared_state_->worker_pool;
     }
 
@@ -2931,9 +2967,17 @@ foundation::base::Result<void> RabbitMqBusModule::OnStop() {
     {
         std::lock_guard<std::mutex> lock(shared_state_->mutex);
         shared_state_->stopping = true;
-        shared_state_->handlers.clear();
         driver = shared_state_->driver;
         worker_pool = shared_state_->worker_pool;
+    }
+
+    // 先等待已提交的业务 handler 结束，再停止 AMQP driver。这样 handler 返回后
+    // 仍有机会通过 driver 发送 ACK/NACK，降低停止过程中的重复投递风险。
+    if (worker_pool) {
+        foundation::base::Result<void> pool_result = worker_pool->Shutdown();
+        if (first_error.IsOk() && !pool_result.IsOk()) {
+            first_error = pool_result;
+        }
     }
 
     if (driver) {
@@ -2943,11 +2987,9 @@ foundation::base::Result<void> RabbitMqBusModule::OnStop() {
         }
     }
 
-    if (worker_pool) {
-        foundation::base::Result<void> pool_result = worker_pool->Shutdown();
-        if (first_error.IsOk() && !pool_result.IsOk()) {
-            first_error = pool_result;
-        }
+    {
+        std::lock_guard<std::mutex> lock(shared_state_->mutex);
+        shared_state_->handlers.clear();
     }
 
     return first_error;

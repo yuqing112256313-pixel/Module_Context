@@ -24,6 +24,8 @@ std::shared_ptr<RabbitMqConnectionDriver> LookupDriver(
         return std::shared_ptr<RabbitMqConnectionDriver>();
     }
 
+    // 每次调用都取当前 driver，而不是在 proxy 中缓存 driver。这样模块重启或重连
+    // 时可以替换底层驱动，已经暴露出去的 IMessageBusService 指针仍然有效。
     std::lock_guard<std::mutex> lock(state->mutex);
     return state->driver;
 }
@@ -64,6 +66,8 @@ foundation::base::Result<void> MessageBusServiceProxy::RegisterConsumerHandler(
         return MakeInvalidArgument("MessageHandler must be valid");
     }
 
+    // consumer_name 是配置层声明的逻辑名，不是队列名。这里先校验配置中确实存在
+    // 该 consumer，避免调用方把 queue 名误当作 handler 注册名。
     std::lock_guard<std::mutex> lock(state_->mutex);
     bool found = false;
     for (std::size_t index = 0; index < state_->config->consumers.size(); ++index) {

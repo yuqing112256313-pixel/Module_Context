@@ -213,6 +213,7 @@ set(MC_CORE_FRAMEWORK_PUBLIC_HEADERS
     include/module_context/messaging/IMessageBusService.h
     include/module_context/messaging/Types.h
     include/module_context/plugin/IPluginManagerService.h
+    include/module_context/plugin/ModuleFactory.h
     include/module_context/plugin/Types.h
 )
 
@@ -287,6 +288,7 @@ install(
 install(
     FILES
         include/module_context/plugin/IPluginManagerService.h
+        include/module_context/plugin/ModuleFactory.h
         include/module_context/plugin/Types.h
     DESTINATION
         ${CMAKE_INSTALL_INCLUDEDIR}/module_context/plugin

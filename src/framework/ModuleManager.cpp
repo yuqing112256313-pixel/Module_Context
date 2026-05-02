@@ -8,7 +8,7 @@
 #include "foundation/base/Result.h"
 #include "foundation/filesystem/PathUtils.h"
 
-#include "plugin/ModuleFactory.h"
+#include "module_context/plugin/ModuleFactory.h"
 
 #include <cstddef>
 #include <cstdint>

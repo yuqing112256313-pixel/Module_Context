@@ -5,6 +5,9 @@ namespace plugin {
 
 /**
  * @brief 工序插件生命周期状态枚举。
+ *
+ * 该状态由插件管理模块对其下游业务/算法插件进行维护，和框架模块自身的
+ * `ModuleState` 分属两层生命周期：前者描述被管理插件，后者描述框架模块。
  */
 enum class PluginState {
     kUnloaded    = 0, ///< 插件尚未加载或已被卸载。

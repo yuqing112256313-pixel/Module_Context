@@ -1,5 +1,5 @@
 #include "module_context/framework/IModuleManager.h"
-#include "plugin/ModuleFactory.h"
+#include "module_context/plugin/ModuleFactory.h"
 #include "framework/ModuleBase.h"
 
 #include "foundation/base/ErrorCode.h"

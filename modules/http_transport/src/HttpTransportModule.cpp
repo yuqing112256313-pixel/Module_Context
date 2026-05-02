@@ -4,7 +4,7 @@
 
 #include "foundation/base/ErrorCode.h"
 #include "foundation/config/ConfigValue.h"
-#include "plugin/ModuleFactory.h"
+#include "module_context/plugin/ModuleFactory.h"
 
 #include "httplib.h"
 #ifdef GetMessage

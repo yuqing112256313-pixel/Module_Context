@@ -6,7 +6,7 @@
 
 #include "module_context/framework/IModuleManager.h"
 
-#include "plugin/ModuleFactory.h"
+#include "module_context/plugin/ModuleFactory.h"
 
 #include "foundation/base/ErrorCode.h"
 #include "foundation/log/Logger.h"

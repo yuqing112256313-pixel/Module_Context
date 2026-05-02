@@ -19,7 +19,9 @@ namespace plugin {
  * 外部使用者通过 `IContext::GetService<IPluginManagerService>()` 获取该接口，
  * 再通过 `GetPlugin<T>(name)` 按工序类型获取底层插件实例指针。
  *
- * 业务层仅依赖本接口，不感知底层 DLL 加载细节。
+ * 该接口描述的是业务/算法插件管理能力，不是模块框架自身的动态库 ABI。
+ * 在当前系统中，`semiplugin_manager` 本身是一个框架模块；它再向下管理
+ * SEMI 工序插件。业务层仅依赖本接口，不感知底层 DLL 加载细节。
  */
 class MC_FRAMEWORK_API IPluginManagerService {
 public:
@@ -32,7 +34,7 @@ public:
      * @brief 查询指定插件的运行时状态。
      *
      * @param name 插件实例名，与配置中的 `name` 字段对应。
-     * @return 插件当前的生命周期状态
+     * @return 插件当前的生命周期状态。
      */
     virtual PluginState GetPluginState(const std::string& name) const = 0;
 

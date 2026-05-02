@@ -96,7 +96,9 @@ struct PendingResult : private foundation::base::NonCopyable {
 };
 
 struct PendingPublishResult : private foundation::base::NonCopyable {
-    std::promise<foundation::base::Result<PublishReceipt> > promise;
+    typedef std::shared_ptr<foundation::base::Result<PublishReceipt> > ResultPtr;
+
+    std::promise<ResultPtr> promise;
     std::mutex mutex;
     bool completed;
 
@@ -212,7 +214,9 @@ void CompletePendingPublishResult(
     }
 
     result->completed = true;
-    result->promise.set_value(value);
+    result->promise.set_value(
+        PendingPublishResult::ResultPtr(
+            new foundation::base::Result<PublishReceipt>(value)));
 }
 
 foundation::base::Result<PublishReceipt> WaitPendingPublishResult(
@@ -224,7 +228,7 @@ foundation::base::Result<PublishReceipt> WaitPendingPublishResult(
             "Pending publish result is unavailable");
     }
 
-    std::future<foundation::base::Result<PublishReceipt> > future =
+    std::future<PendingPublishResult::ResultPtr> future =
         result->promise.get_future();
     if (timeout_ms > 0) {
         const std::future_status status =
@@ -236,7 +240,14 @@ foundation::base::Result<PublishReceipt> WaitPendingPublishResult(
         }
     }
 
-    return future.get();
+    PendingPublishResult::ResultPtr value = future.get();
+    if (!value) {
+        return foundation::base::Result<PublishReceipt>(
+            foundation::base::ErrorCode::kUnknown,
+            "AMQP publisher confirm completed without result");
+    }
+
+    return *value;
 }
 
 foundation::base::Result<foundation::config::ConfigValue> GetRequiredObjectField(

@@ -49,6 +49,7 @@ add_executable(mc_module_manager_config_test
 )
 
 mc_configure_test_target(mc_module_manager_config_test)
+add_dependencies(mc_module_manager_config_test mc_test_config_plugin)
 
 target_link_libraries(mc_module_manager_config_test
     PRIVATE
@@ -72,7 +73,13 @@ add_test(
     COMMAND mc_module_manager_config_test
 )
 
-if(TARGET rabbitmq_bus)
+if(TARGET amqp_bus OR TARGET rabbitmq_bus)
+    if(TARGET amqp_bus)
+        set(MC_TEST_MESSAGE_BUS_PLUGIN_TARGET amqp_bus)
+    else()
+        set(MC_TEST_MESSAGE_BUS_PLUGIN_TARGET rabbitmq_bus)
+    endif()
+
     add_executable(mc_rabbitmq_bus_module_test
         rabbitmq_bus_module_test.cpp
         ../modules/rabbitmq_bus/src/internal/MessageBusServiceProxy.cpp
@@ -112,7 +119,8 @@ if(TARGET rabbitmq_bus)
 
     target_compile_definitions(mc_rabbitmq_bus_plugin_integration_test
         PRIVATE
-            MC_TEST_RABBITMQ_BUS_PLUGIN_PATH="$<TARGET_FILE:rabbitmq_bus>"
+            MC_TEST_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}"
+            MC_TEST_RABBITMQ_BUS_PLUGIN_PATH="$<TARGET_FILE:${MC_TEST_MESSAGE_BUS_PLUGIN_TARGET}>"
     )
 
     add_test(

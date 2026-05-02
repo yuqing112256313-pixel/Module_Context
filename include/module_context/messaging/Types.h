@@ -50,6 +50,41 @@ enum class ConnectionState {
 };
 
 /**
+ * @brief 消息总线能力开关。
+ *
+ * 能力描述当前服务实现是否支持某类 AMQP 行为。它不是业务配置项，也不表示当前
+ * 连接一定已经就绪。
+ */
+enum class MessageBusFeature {
+    /**
+     * @brief 支持等待 broker publisher confirm。
+     */
+    PublisherConfirm = 0,
+    /**
+     * @brief 支持 AMQP mandatory 返回不可路由消息。
+     */
+    MandatoryReturn = 1
+};
+
+/**
+ * @brief 可靠发布完成后的 broker 处置结果。
+ */
+enum class PublishDisposition {
+    /**
+     * @brief broker 已确认接收发布命令。
+     */
+    BrokerAccepted = 0,
+    /**
+     * @brief broker 对发布命令返回 negative acknowledgement。
+     */
+    BrokerRejected = 1,
+    /**
+     * @brief 消息带 mandatory 语义发布，但 broker 未能路由到队列。
+     */
+    Returned = 2
+};
+
+/**
  * @brief 交换机声明参数。
  */
 struct MC_FRAMEWORK_API ExchangeSpec {
@@ -155,6 +190,46 @@ struct MC_FRAMEWORK_API PublishRequest {
           headers(),
           persistent(false),
           mandatory(false) {
+    }
+};
+
+/**
+ * @brief broker 确认发布的等待选项。
+ */
+struct MC_FRAMEWORK_API PublishConfirmOptions {
+    /**
+     * @brief 最长等待确认时间，单位毫秒。
+     *
+     * 小于等于 0 表示无限等待。平台代码通常应给出明确超时，避免调用线程被网络
+     * 或 broker 状态长期挂住。
+     */
+    int timeout_ms;
+    /**
+     * @brief 是否要求消息至少路由到一个队列。
+     *
+     * 开启后服务会使用 AMQP mandatory 语义发布本次消息。若 broker 返回
+     * basic.return，`PublishConfirmed()` 会返回 `Returned` 处置结果。
+     */
+    bool require_routable;
+
+    PublishConfirmOptions()
+        : timeout_ms(5000),
+          require_routable(false) {
+    }
+};
+
+/**
+ * @brief broker 确认发布后的回执。
+ */
+struct MC_FRAMEWORK_API PublishReceipt {
+    PublishDisposition disposition;
+    int reply_code;
+    std::string reply_text;
+
+    PublishReceipt()
+        : disposition(PublishDisposition::BrokerAccepted),
+          reply_code(0),
+          reply_text() {
     }
 };
 

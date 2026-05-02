@@ -27,7 +27,7 @@ cmake -S . -B build\vs2015-qt-demo -G "Visual Studio 14 2015 Win64" `
 cmake --build build\vs2015-qt-demo --config Debug --target mc_task_flow_qt_master_demo
 ```
 
-运行时把 Qt 运行库放到 exe 可搜索路径，或用 Qt 自带的 `windeployqt` 处理。`rabbitmq_bus.dll`、`http_transport.dll`、`mc_core_framework.dll` 会随 target 构建后复制到 exe 目录。
+运行时把 Qt 运行库放到 exe 可搜索路径，或用 Qt 自带的 `windeployqt` 处理。`amqp_bus.dll`、`http_transport.dll`、`mc_core_framework.dll` 会随 target 构建后复制到 exe 目录。
 
 Debug 配置下 demo exe 名称带 `d` 后缀，Release 配置不带后缀。工程内的 framework/module DLL 仍沿用现有项目命名和导入库规则，MSVC 会为 DLL 目标生成对应 `.lib` 导入库。
 
@@ -40,7 +40,7 @@ Debug 配置下 demo exe 名称带 `d` 后缀，Release 配置不带后缀。工
 5. 远程实机测试时，把 RabbitMQ Host 填成主机实际 IP，并先在从机侧启动 worker。
 6. 点击“启动 E2E”。
 
-Qt demo 构建后会把 `mc_task_flow_worker_host.exe`、`rabbitmq_bus.dll`、
+Qt demo 构建后会把 `mc_task_flow_worker_host.exe`、`amqp_bus.dll`、
 `http_transport.dll`、`semiplugin_manager.dll` 和示例算法插件复制到桌面程序目录。
 因此单机离线测试不依赖 `examples/task_flow/field_deploy/scripts`。
 桌面端也不会在 `examples` 输出目录预放 config；每次点击启动时，它会在运行输出目录下生成

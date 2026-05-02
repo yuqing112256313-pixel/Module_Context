@@ -51,10 +51,10 @@ if(WIN32 AND TARGET mc_core_framework)
     )
 endif()
 
-if(WIN32 AND TARGET rabbitmq_bus)
+if(WIN32 AND TARGET amqp_bus)
     add_custom_command(TARGET mc_task_flow_qt_master_demo POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:rabbitmq_bus>
+            $<TARGET_FILE:amqp_bus>
             $<TARGET_FILE_DIR:mc_task_flow_qt_master_demo>
     )
 endif()

@@ -200,7 +200,7 @@ function New-WorkerModuleConfig {
     $modules = @(
         @{
             name = $BusModuleName
-            type = 'rabbitmq_bus'
+            type = 'amqp_bus'
             library_path = $RabbitPluginPath
             config = @{
                 connection = (New-ConnectionConfig -Uri $Uri)
@@ -446,7 +446,7 @@ if (-not (Test-TcpPort -HostName $RabbitMqHost -Port 5672 -TimeoutMs 3000)) {
 
 $ExamplesDir = Join-Path $BuildDir 'examples\task_flow'
 $workerExe = Resolve-ExampleArtifact -ExamplesDir $ExamplesDir -ConfigurationName $Configuration -Name 'mc_task_flow_worker_host'
-$rabbitPluginDll = Resolve-ExampleArtifact -ExamplesDir $ExamplesDir -ConfigurationName $Configuration -Name 'rabbitmq_bus'
+$rabbitPluginDll = Resolve-ExampleArtifact -ExamplesDir $ExamplesDir -ConfigurationName $Configuration -Name 'amqp_bus'
 $httpPluginDll = Resolve-ExampleArtifact -ExamplesDir $ExamplesDir -ConfigurationName $Configuration -Name 'http_transport'
 if ($UseAlgorithmPlugin) {
     if ([string]::IsNullOrWhiteSpace($SemipluginManagerPath)) {
@@ -504,8 +504,8 @@ try {
     Write-Host "[worker] RabbitMQ AMQP: $RabbitMqHost`:5672"
     Write-Host "[worker] HTTP endpoint: $HttpEndpoint$HttpRoute"
     Write-Host "[worker] HTTP chunk bytes: $HttpChunkBytes"
-    Write-Host "[worker] rabbitmq_bus.dll: $rabbitPluginDll"
-    Write-Host "[worker] rabbitmq_bus.dll sha256: $(Get-FileSha256 -Path $rabbitPluginDll)"
+    Write-Host "[worker] amqp_bus.dll: $rabbitPluginDll"
+    Write-Host "[worker] amqp_bus.dll sha256: $(Get-FileSha256 -Path $rabbitPluginDll)"
     if ($UseAlgorithmPlugin) {
         Write-Host "[worker] semiplugin_manager.dll: $SemipluginManagerPath"
         Write-Host "[worker] algorithm plugin: $AlgorithmPluginName -> $AlgorithmPluginPath"

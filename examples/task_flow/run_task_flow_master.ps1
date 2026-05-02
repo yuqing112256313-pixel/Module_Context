@@ -990,7 +990,7 @@ function New-MasterModuleConfig {
         modules = @(
             @{
                 name = $BusModuleName
-                type = 'rabbitmq_bus'
+                type = 'amqp_bus'
                 library_path = $RabbitPluginPath
                 config = @{
                     connection = (New-ConnectionConfig -Uri $Uri)
@@ -1107,7 +1107,7 @@ $RabbitMqAuthHeader = Get-BasicAuthHeader -UserName $RabbitMqAdminUser -Password
 
 $ExamplesDir = Join-Path $BuildDir 'examples\task_flow'
 $masterExe = Resolve-ExampleArtifact -Name 'mc_task_flow_master_host'
-$rabbitPluginDll = Resolve-ExampleArtifact -Name 'rabbitmq_bus'
+$rabbitPluginDll = Resolve-ExampleArtifact -Name 'amqp_bus'
 $httpPluginDll = Resolve-ExampleArtifact -Name 'http_transport'
 
 $runtimeDir = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {

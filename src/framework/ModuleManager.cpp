@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace module_context {
 namespace framework {
@@ -319,7 +320,23 @@ foundation::base::Result<void> ValidateConfiguredModule(
                 ", runtime.name=" + module->ModuleName());
     }
 
-    if (runtime_type != spec.type) {
+    bool type_matches = runtime_type == spec.type;
+    if (!type_matches) {
+        const IModuleTypeMetadata* metadata =
+            dynamic_cast<const IModuleTypeMetadata*>(module);
+        if (metadata != NULL) {
+            const std::vector<std::string> aliases =
+                metadata->ModuleTypeAliases();
+            for (std::size_t index = 0; index < aliases.size(); ++index) {
+                if (aliases[index] == spec.type) {
+                    type_matches = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!type_matches) {
         return foundation::base::Result<void>(
             foundation::base::ErrorCode::kInvalidState,
             "module type mismatch after creation, config.name=" + spec.name +

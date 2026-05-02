@@ -19,6 +19,10 @@ foundation::base::Result<void> PublishWithDriver(
 foundation::base::Result<void> PublishAsyncWithDriver(
     const std::shared_ptr<RabbitMqConnectionDriver>& driver,
     const PublishRequest& request);
+foundation::base::Result<PublishReceipt> PublishConfirmedWithDriver(
+    const std::shared_ptr<RabbitMqConnectionDriver>& driver,
+    const PublishRequest& request,
+    const PublishConfirmOptions& options);
 foundation::base::Result<void> DeclareExchangeWithDriver(
     const std::shared_ptr<RabbitMqConnectionDriver>& driver,
     const ExchangeSpec& spec);
@@ -30,6 +34,9 @@ foundation::base::Result<void> BindQueueWithDriver(
     const BindingSpec& spec);
 ConnectionState GetConnectionStateFromDriver(
     const std::shared_ptr<RabbitMqConnectionDriver>& driver);
+bool SupportsFeatureFromDriver(
+    const std::shared_ptr<RabbitMqConnectionDriver>& driver,
+    MessageBusFeature feature);
 
 }  // namespace messaging
 }  // namespace module_context

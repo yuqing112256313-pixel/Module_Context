@@ -12,6 +12,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace {
 
@@ -20,7 +21,9 @@ using module_context::messaging::ConnectionState;
 using module_context::messaging::ConsumeAction;
 using module_context::messaging::IncomingMessage;
 using module_context::messaging::IMessageBusService;
+using module_context::messaging::MessageBusFeature;
 using module_context::messaging::PublishRequest;
+using module_context::messaging::PublishConfirmOptions;
 using module_context::messaging::RabbitMqBusModule;
 
 bool Expect(bool condition, const std::string& message) {
@@ -178,7 +181,7 @@ public:
 
     foundation::base::Result<ConfigValue> ModuleConfig(
         const std::string& name) override {
-        if (name != "rabbitmq_bus") {
+        if (name != "amqp_bus" && name != "rabbitmq_bus") {
             return foundation::base::Result<ConfigValue>(
                 foundation::base::ErrorCode::kNotFound,
                 "Unknown module config");
@@ -289,8 +292,22 @@ bool RunLifecycleCase() {
         return false;
     }
 
-    if (!Expect(module.ModuleType() == "rabbitmq_bus",
-                "RabbitMqBusModule should expose ModuleType")) {
+    if (!Expect(module.ModuleType() == "amqp_bus",
+                "RabbitMqBusModule should expose the platform ModuleType")) {
+        return false;
+    }
+
+    std::vector<std::string> aliases = module.ModuleTypeAliases();
+    if (!Expect(
+            aliases.size() == 1 && aliases[0] == "rabbitmq_bus",
+            "RabbitMqBusModule should keep rabbitmq_bus as a legacy type alias")) {
+        return false;
+    }
+
+    if (!Expect(
+            bus_api->SupportsFeature(MessageBusFeature::PublisherConfirm) &&
+                bus_api->SupportsFeature(MessageBusFeature::MandatoryReturn),
+            "AMQP bus should report publisher confirm and mandatory return support")) {
         return false;
     }
 
@@ -315,6 +332,18 @@ bool RunLifecycleCase() {
                 publish_async_before_start.GetError() ==
                     foundation::base::ErrorCode::kDisconnected,
             "PublishAsync before Start should return kDisconnected")) {
+        return false;
+    }
+
+    PublishConfirmOptions confirm_options;
+    foundation::base::Result<module_context::messaging::PublishReceipt>
+        confirmed_before_start =
+            bus_api->PublishConfirmed(request, confirm_options);
+    if (!Expect(
+            !confirmed_before_start.IsOk() &&
+                confirmed_before_start.GetError() ==
+                    foundation::base::ErrorCode::kDisconnected,
+            "PublishConfirmed before Start should return kDisconnected")) {
         return false;
     }
 
@@ -362,6 +391,17 @@ bool RunLifecycleCase() {
                 publish_async_after_start.GetError() ==
                     foundation::base::ErrorCode::kDisconnected,
             "PublishAsync while broker is unavailable should return kDisconnected")) {
+        return false;
+    }
+
+    foundation::base::Result<module_context::messaging::PublishReceipt>
+        confirmed_after_start =
+            bus_api->PublishConfirmed(request, confirm_options);
+    if (!Expect(
+            !confirmed_after_start.IsOk() &&
+                confirmed_after_start.GetError() ==
+                    foundation::base::ErrorCode::kDisconnected,
+            "PublishConfirmed while broker is unavailable should return kDisconnected")) {
         return false;
     }
 

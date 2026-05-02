@@ -137,6 +137,7 @@ if (-not $SkipBuild) {
         -G Ninja `
         "-DCMAKE_BUILD_TYPE=$Configuration" `
         -DMC_BUILD_TESTS=ON `
+        -DMC_BUILD_AMQP_BUS_MODULE=ON `
         -DMC_BUILD_RABBITMQ_MODULE=ON `
         -DMC_BUILD_HTTP_TRANSPORT_MODULE=ON `
         -DMC_BUILD_SEMIPLUGIN_MANAGER_MODULE=ON `
@@ -145,7 +146,7 @@ if (-not $SkipBuild) {
         throw "cmake configure failed: $LASTEXITCODE"
     }
 
-    & $cmake --build $BuildDir --target mc_task_flow_master_host mc_task_flow_worker_host rabbitmq_bus http_transport semiplugin_manager tgv_etching_semiplugin
+    & $cmake --build $BuildDir --target mc_task_flow_master_host mc_task_flow_worker_host amqp_bus http_transport semiplugin_manager tgv_etching_semiplugin
     if ($LASTEXITCODE -ne 0) {
         throw "cmake build failed: $LASTEXITCODE"
     }
@@ -159,7 +160,7 @@ $workerRoot = Join-Path $stageRoot 'TaskFlowWorker'
 $masterBin = Join-Path $masterRoot 'build\examples\task_flow'
 $workerBin = Join-Path $workerRoot 'build\examples\task_flow'
 $buildTaskFlowDir = Join-Path $BuildDir 'examples\task_flow'
-$buildRabbitMqDll = Join-Path $BuildDir 'modules\rabbitmq_bus\rabbitmq_bus.dll'
+$buildRabbitMqDll = Join-Path $BuildDir 'modules\rabbitmq_bus\amqp_bus.dll'
 $buildHttpTransportDll = Join-Path $BuildDir 'modules\http_transport\http_transport.dll'
 $buildSemipluginManagerDll = Join-Path $BuildDir 'modules\semiplugin_manager\semiplugin_manager.dll'
 $buildTgvEtchingPluginDll = Join-Path $buildTaskFlowDir 'tgv_etching_semiplugin.dll'

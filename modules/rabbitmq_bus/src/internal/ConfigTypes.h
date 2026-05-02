@@ -70,10 +70,10 @@ struct PublisherSpec {
 };
 
 /**
- * @brief rabbitmq_bus 模块完整运行配置。
+ * @brief AMQP bus 模块完整运行配置。
  *
- * 字段采用 AMQP 通用语义。模块名仍保留 `rabbitmq_bus` 是为了兼容现有配置和
- * 构建产物；实现主体没有依赖 RabbitMQ Management API。
+ * 字段采用 AMQP 通用语义。标准模块类型为 `amqp_bus`，`rabbitmq_bus` 仅作为
+ * 旧配置别名；实现主体没有依赖 RabbitMQ Management API。
  */
 struct RabbitMqBusConfig {
     ConnectionConfig connection;
@@ -83,6 +83,9 @@ struct RabbitMqBusConfig {
     std::vector<BindingSpec> bindings;
     std::vector<PublisherSpec> publishers;
     std::vector<ConsumerSpec> consumers;
+    // 默认开启 publisher confirm，让平台层具备可靠发布能力；若目标 AMQP broker
+    // 不支持该扩展，可在配置 features.publisher_confirm=false 关闭。
+    bool publisher_confirms_enabled;
 
     RabbitMqBusConfig()
         : connection(),
@@ -91,7 +94,8 @@ struct RabbitMqBusConfig {
           queues(),
           bindings(),
           publishers(),
-          consumers() {
+          consumers(),
+          publisher_confirms_enabled(true) {
     }
 };
 

@@ -50,13 +50,19 @@ foundation::base::Result<void> MessageBusServiceProxy::PublishAsync(
     return PublishAsyncWithDriver(LookupDriver(state_), request);
 }
 
+foundation::base::Result<PublishReceipt> MessageBusServiceProxy::PublishConfirmed(
+    const PublishRequest& request,
+    const PublishConfirmOptions& options) {
+    return PublishConfirmedWithDriver(LookupDriver(state_), request, options);
+}
+
 foundation::base::Result<void> MessageBusServiceProxy::RegisterConsumerHandler(
     const std::string& consumer_name,
     MessageHandler handler) {
     if (!state_ || !state_->config) {
         return foundation::base::Result<void>(
             foundation::base::ErrorCode::kInvalidState,
-            "RabbitMQ bus shared state is unavailable");
+            "AMQP bus shared state is unavailable");
     }
 
     if (consumer_name.empty()) {
@@ -91,7 +97,7 @@ foundation::base::Result<void> MessageBusServiceProxy::UnregisterConsumerHandler
     if (!state_) {
         return foundation::base::Result<void>(
             foundation::base::ErrorCode::kInvalidState,
-            "RabbitMQ bus shared state is unavailable");
+            "AMQP bus shared state is unavailable");
     }
 
     std::lock_guard<std::mutex> lock(state_->mutex);
@@ -128,6 +134,22 @@ ConnectionState MessageBusServiceProxy::GetConnectionState() const {
     }
 
     return GetConnectionStateFromDriver(LookupDriver(state_));
+}
+
+bool MessageBusServiceProxy::SupportsFeature(MessageBusFeature feature) const {
+    switch (feature) {
+        case MessageBusFeature::MandatoryReturn:
+            return true;
+        case MessageBusFeature::PublisherConfirm: {
+            if (!state_) {
+                return true;
+            }
+            std::lock_guard<std::mutex> lock(state_->mutex);
+            return !state_->config || state_->config->publisher_confirms_enabled;
+        }
+        default:
+            return false;
+    }
 }
 
 }  // namespace messaging

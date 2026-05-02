@@ -22,7 +22,7 @@ $fieldConfig = Import-TaskFlowFieldConfig -PackageRoot $packageRoot
 $RabbitMqHost = Get-TaskFlowString -Value $RabbitMqHost -Fallback ([string]$fieldConfig.Master.Host)
 $RabbitMqPort = Get-TaskFlowInt -Value $RabbitMqPort -Fallback ([int]$fieldConfig.RabbitMq.AmqpPort)
 $bin = Join-Path $packageRoot 'build\examples\task_flow'
-foreach ($name in @('mc_task_flow_worker_host.exe', 'rabbitmq_bus.dll', 'http_transport.dll', 'semiplugin_manager.dll', 'tgv_etching_semiplugin.dll', 'libmc_core_framework.dll', 'libc++.dll', 'libunwind.dll')) {
+foreach ($name in @('mc_task_flow_worker_host.exe', 'amqp_bus.dll', 'http_transport.dll', 'semiplugin_manager.dll', 'tgv_etching_semiplugin.dll', 'libmc_core_framework.dll', 'libc++.dll', 'libunwind.dll')) {
     $path = Join-Path $bin $name
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Required runtime file missing: $path"

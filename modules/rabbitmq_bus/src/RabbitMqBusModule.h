@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace module_context {
 namespace messaging {
@@ -15,26 +16,32 @@ struct RabbitMqBusSharedState;
 class MessageBusServiceProxy;
 
 /**
- * @brief AMQP 消息总线模块的 RabbitMQ/AMQP-CPP 实现。
+ * @brief AMQP 消息总线模块的 AMQP-CPP 实现。
  *
  * 模块本体负责框架生命周期和配置装载，`IMessageBusService` 的实际调用路径
  * 委托给 `MessageBusServiceProxy`。这样服务能力可以通过共享状态访问当前驱动，
- * 而不把连接线程、worker pool 和模块状态机直接暴露给调用方。
+ * 而不把连接线程、worker pool 和模块状态机直接暴露给调用方。标准模块类型为
+ * `amqp_bus`，`rabbitmq_bus` 仅作为历史配置别名保留。
  */
 class RabbitMqBusModule final
     : public module_context::framework::ModuleBase,
+      public module_context::framework::IModuleTypeMetadata,
       public IMessageBusService {
 public:
     RabbitMqBusModule();
     ~RabbitMqBusModule() override;
 
     std::string ModuleType() const override;
+    std::vector<std::string> ModuleTypeAliases() const override;
     std::string ModuleVersion() const override;
 
     foundation::base::Result<void> Publish(
         const PublishRequest& request) override;
     foundation::base::Result<void> PublishAsync(
         const PublishRequest& request) override;
+    foundation::base::Result<PublishReceipt> PublishConfirmed(
+        const PublishRequest& request,
+        const PublishConfirmOptions& options) override;
     foundation::base::Result<void> RegisterConsumerHandler(
         const std::string& consumer_name,
         MessageHandler handler) override;
@@ -47,6 +54,7 @@ public:
     foundation::base::Result<void> BindQueue(
         const BindingSpec& spec) override;
     ConnectionState GetConnectionState() const override;
+    bool SupportsFeature(MessageBusFeature feature) const override;
 
 protected:
     foundation::base::Result<void> OnInit() override;

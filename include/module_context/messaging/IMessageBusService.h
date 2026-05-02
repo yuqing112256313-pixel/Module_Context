@@ -31,8 +31,8 @@ public:
     /**
      * @brief 发布消息。
      *
-     * 同步发布会等待消息命令进入底层 AMQP channel。它不等价于 broker 持久化确认；
-     * 需要 publisher confirm 时应另行扩展确认语义。
+     * 同步发布会等待消息命令进入底层 AMQP channel。它不等价于 broker 确认；
+     * 需要可靠发布时应使用 `PublishConfirmed()`。
      *
      * @param request 发布请求。
      * @return 成功返回 `Ok`；失败时返回连接或参数错误。
@@ -51,6 +51,24 @@ public:
      */
     virtual foundation::base::Result<void> PublishAsync(
         const PublishRequest& request) = 0;
+    /**
+     * @brief 发布消息并等待 broker publisher confirm。
+     *
+     * 该接口用于需要可靠发布语义的调用方。返回 `Ok` 表示已经得到 broker 的明确
+     * 处置回执；具体是否接收、拒绝或 mandatory 不可路由由 `PublishReceipt`
+     * 表达。超时、连接中断或实现不支持确认能力会返回错误。
+     *
+     * `options.require_routable` 会为本次发布启用 AMQP mandatory 语义，用于确认
+     * 消息至少路由到一个队列。它和 publisher confirm 是两层不同保证：前者关注
+     * 路由，后者关注 broker 是否接收发布命令。
+     *
+     * @param request 发布请求。
+     * @param options 确认等待选项。
+     * @return 成功返回 broker 处置回执；失败返回连接、超时或能力错误。
+     */
+    virtual foundation::base::Result<PublishReceipt> PublishConfirmed(
+        const PublishRequest& request,
+        const PublishConfirmOptions& options) = 0;
     /**
      * @brief 注册指定消费者的消息处理回调。
      *
@@ -109,6 +127,13 @@ public:
      * @return 当前连接状态。
      */
     virtual ConnectionState GetConnectionState() const = 0;
+    /**
+     * @brief 查询当前服务实现是否支持指定 AMQP 能力。
+     *
+     * @param feature 待查询能力。
+     * @return 支持返回 `true`，否则返回 `false`。
+     */
+    virtual bool SupportsFeature(MessageBusFeature feature) const = 0;
 };
 
 }  // namespace messaging

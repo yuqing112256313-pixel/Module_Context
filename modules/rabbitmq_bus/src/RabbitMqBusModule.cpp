@@ -95,6 +95,34 @@ struct PendingResult : private foundation::base::NonCopyable {
     }
 };
 
+struct PendingPublishResult : private foundation::base::NonCopyable {
+    std::promise<foundation::base::Result<PublishReceipt> > promise;
+    std::mutex mutex;
+    bool completed;
+
+    PendingPublishResult()
+        : promise(),
+          mutex(),
+          completed(false) {
+    }
+};
+
+struct PendingPublishConfirm {
+    PublishRequest request;
+    std::shared_ptr<PendingPublishResult> result;
+    bool returned;
+    int reply_code;
+    std::string reply_text;
+
+    PendingPublishConfirm()
+        : request(),
+          result(),
+          returned(false),
+          reply_code(0),
+          reply_text() {
+    }
+};
+
 struct DeliveryContext {
     std::string consumer_name;
     std::uint64_t delivery_tag;
@@ -169,6 +197,46 @@ foundation::base::Result<void> WaitPendingResult(
     }
 
     return result->promise.get_future().get();
+}
+
+void CompletePendingPublishResult(
+    const std::shared_ptr<PendingPublishResult>& result,
+    const foundation::base::Result<PublishReceipt>& value) {
+    if (!result) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(result->mutex);
+    if (result->completed) {
+        return;
+    }
+
+    result->completed = true;
+    result->promise.set_value(value);
+}
+
+foundation::base::Result<PublishReceipt> WaitPendingPublishResult(
+    const std::shared_ptr<PendingPublishResult>& result,
+    int timeout_ms) {
+    if (!result) {
+        return foundation::base::Result<PublishReceipt>(
+            foundation::base::ErrorCode::kInvalidArgument,
+            "Pending publish result is unavailable");
+    }
+
+    std::future<foundation::base::Result<PublishReceipt> > future =
+        result->promise.get_future();
+    if (timeout_ms > 0) {
+        const std::future_status status =
+            future.wait_for(std::chrono::milliseconds(timeout_ms));
+        if (status != std::future_status::ready) {
+            return foundation::base::Result<PublishReceipt>(
+                foundation::base::ErrorCode::kTimeout,
+                "Timed out waiting for AMQP publisher confirm");
+        }
+    }
+
+    return future.get();
 }
 
 foundation::base::Result<foundation::config::ConfigValue> GetRequiredObjectField(
@@ -921,7 +989,7 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
     if (!config_value.IsObject()) {
         return foundation::base::Result<RabbitMqBusConfig>(
             foundation::base::ErrorCode::kParseError,
-            "RabbitMQ bus config must be an object");
+            "AMQP bus config must be an object");
     }
 
     RabbitMqBusConfig config;
@@ -964,13 +1032,23 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
         GetOptionalInt64Field(worker_pool.Value(), "thread_count", 4);
     foundation::base::Result<foundation::config::ConfigValue> topology =
         GetOptionalObjectField(config_value, "topology");
+    foundation::base::Result<foundation::config::ConfigValue> features =
+        GetOptionalObjectField(config_value, "features");
 
     if (!reconnect_enabled.IsOk() || !reconnect_initial.IsOk() ||
         !reconnect_max.IsOk() || !worker_pool.IsOk() || !thread_count.IsOk() ||
-        !topology.IsOk()) {
+        !topology.IsOk() || !features.IsOk()) {
         return foundation::base::Result<RabbitMqBusConfig>(
             foundation::base::ErrorCode::kParseError,
-            "Invalid reconnect or worker_pool configuration");
+            "Invalid reconnect, worker_pool, or features configuration");
+    }
+
+    foundation::base::Result<bool> publisher_confirms_enabled =
+        GetOptionalBoolField(features.Value(), "publisher_confirm", true);
+    if (!publisher_confirms_enabled.IsOk()) {
+        return foundation::base::Result<RabbitMqBusConfig>(
+            foundation::base::ErrorCode::kParseError,
+            "Invalid features.publisher_confirm configuration");
     }
 
     if (heartbeat.Value() < 0 ||
@@ -986,7 +1064,7 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
         thread_count.Value() <= 0) {
         return foundation::base::Result<RabbitMqBusConfig>(
             foundation::base::ErrorCode::kParseError,
-            "Invalid timing or thread_count values in RabbitMQ config");
+            "Invalid timing or thread_count values in AMQP config");
     }
 
     config.connection.uri = uri.Value();
@@ -1003,6 +1081,7 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
         static_cast<int>(reconnect_max.Value());
     config.worker_thread_count =
         static_cast<std::size_t>(thread_count.Value());
+    config.publisher_confirms_enabled = publisher_confirms_enabled.Value();
 
     foundation::base::Result<foundation::config::ConfigValue::Array> exchanges =
         GetOptionalArrayField(topology.Value(), "exchanges");
@@ -1019,7 +1098,7 @@ foundation::base::Result<RabbitMqBusConfig> ParseBusConfig(
         !publishers.IsOk() || !consumers.IsOk()) {
         return foundation::base::Result<RabbitMqBusConfig>(
             foundation::base::ErrorCode::kParseError,
-            "RabbitMQ arrays must be arrays when provided");
+            "AMQP arrays must be arrays when provided");
     }
 
     foundation::base::Result<void> parse_exchanges = ParseUniqueArray<ExchangeSpec>(
@@ -1351,6 +1430,9 @@ public:
     foundation::base::Result<void> Stop();
     foundation::base::Result<void> Publish(const PublishRequest& request);
     foundation::base::Result<void> PublishAsync(const PublishRequest& request);
+    foundation::base::Result<PublishReceipt> PublishConfirmed(
+        const PublishRequest& request,
+        const PublishConfirmOptions& options);
     foundation::base::Result<void> DeclareExchange(const ExchangeSpec& spec);
     foundation::base::Result<void> DeclareQueue(const QueueSpec& spec);
     foundation::base::Result<void> BindQueue(const BindingSpec& spec);
@@ -1386,6 +1468,7 @@ private:
     void RequestDisconnect(const std::string& reason);
     void HandleDisconnect(const std::string& reason);
     void StartBootstrap();
+    void EnablePublisherConfirms();
     void BootstrapExchanges(std::size_t index);
     void BootstrapQueues(std::size_t index);
     void BootstrapBindings(std::size_t index);
@@ -1395,6 +1478,15 @@ private:
         const PublishRequest& request,
         AMQP::Envelope* envelope) const;
     int PublishFlags(const PublishRequest& request) const;
+    void CompletePublishConfirm(std::uint64_t delivery_tag,
+                                bool multiple,
+                                PublishDisposition disposition,
+                                int reply_code,
+                                const std::string& reply_text);
+    void FailPendingPublishes(const std::string& reason);
+    bool MarkReturnedPublish(const AMQP::Message& message,
+                             int16_t code,
+                             const std::string& description);
     void HandleReturnedMessage(
         const AMQP::Message& message,
         int16_t code,
@@ -1421,6 +1513,9 @@ private:
     bool connected_;
     bool ready_;
     bool handshake_ready_;
+    bool publisher_confirms_ready_;
+    std::uint64_t next_publish_confirm_tag_;
+    std::map<std::uint64_t, PendingPublishConfirm> pending_publish_confirms_;
     bool pending_disconnect_;
     std::string pending_disconnect_reason_;
     std::string outbound_;
@@ -1449,6 +1544,9 @@ RabbitMqConnectionDriver::RabbitMqConnectionDriver(
       connected_(false),
       ready_(false),
       handshake_ready_(false),
+      publisher_confirms_ready_(false),
+      next_publish_confirm_tag_(1),
+      pending_publish_confirms_(),
       pending_disconnect_(false),
       pending_disconnect_reason_(),
       outbound_(),
@@ -1465,7 +1563,7 @@ RabbitMqConnectionDriver::~RabbitMqConnectionDriver() {
 foundation::base::Result<void> RabbitMqConnectionDriver::Start() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (thread_.joinable()) {
-        return MakeInvalidState("RabbitMQ connection driver already started");
+        return MakeInvalidState("AMQP connection driver already started");
     }
 
     stop_requested_ = false;
@@ -1541,14 +1639,14 @@ foundation::base::Result<void> RabbitMqConnectionDriver::Publish(
             if (!IsReadyLocked()) {
                 CompletePendingResult(
                     pending,
-                    MakeDisconnected("RabbitMQ connection is not ready"));
+                    MakeDisconnected("AMQP connection is not ready"));
                 return;
             }
 
             if (!publish_channel_) {
                 CompletePendingResult(
                     pending,
-                    MakeDisconnected("RabbitMQ publisher channel is unavailable"));
+                    MakeDisconnected("AMQP publisher channel is unavailable"));
                 return;
             }
 
@@ -1579,6 +1677,9 @@ foundation::base::Result<void> RabbitMqConnectionDriver::Publish(
                 return;
             }
 
+            if (publisher_confirms_ready_) {
+                ++next_publish_confirm_tag_;
+            }
             CompletePendingResult(pending, foundation::base::MakeSuccess());
         });
 
@@ -1600,25 +1701,25 @@ foundation::base::Result<void> RabbitMqConnectionDriver::PublishAsync(
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!thread_.joinable() || stop_requested_) {
-            return MakeInvalidState("RabbitMQ connection driver is not running");
+            return MakeInvalidState("AMQP connection driver is not running");
         }
         // 这里只读取受 mutex_ 保护的连接状态，避免从调用线程直接读取 AMQP channel
         // 指针等驱动线程字段。真正发布前还会在驱动线程中再次检查 IsReadyLocked()。
         if (state_ != ConnectionState::Connected) {
-            return MakeDisconnected("RabbitMQ connection is not ready");
+            return MakeDisconnected("AMQP connection is not ready");
         }
     }
 
     return EnqueueCommand([this, request]() {
         if (!IsReadyLocked()) {
             FOUNDATION_LOG_WARNING(
-                "Dropped publish command because RabbitMQ connection became unavailable");
+                "Dropped publish command because AMQP connection became unavailable");
             return;
         }
 
         if (!publish_channel_) {
             FOUNDATION_LOG_ERROR(
-                "RabbitMQ async publish failed because publisher channel is unavailable");
+                "AMQP async publish failed because publisher channel is unavailable");
             return;
         }
 
@@ -1644,7 +1745,111 @@ foundation::base::Result<void> RabbitMqConnectionDriver::PublishAsync(
                 << request.exchange << "'");
             return;
         }
+
+        if (publisher_confirms_ready_) {
+            ++next_publish_confirm_tag_;
+        }
     });
+}
+
+foundation::base::Result<PublishReceipt> RabbitMqConnectionDriver::PublishConfirmed(
+    const PublishRequest& request,
+    const PublishConfirmOptions& options) {
+    PublishRequest effective_request = request;
+    if (options.require_routable) {
+        effective_request.mandatory = true;
+    }
+
+    foundation::base::Result<void> target_result =
+        ValidatePublishTarget(
+            effective_request.exchange,
+            effective_request.routing_key);
+    if (!target_result.IsOk()) {
+        return foundation::base::Result<PublishReceipt>(
+            target_result.GetError(),
+            target_result.GetMessage());
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!thread_.joinable() || stop_requested_) {
+            return foundation::base::Result<PublishReceipt>(
+                foundation::base::ErrorCode::kInvalidState,
+                "AMQP connection driver is not running");
+        }
+        if (state_ != ConnectionState::Connected) {
+            return foundation::base::Result<PublishReceipt>(
+                foundation::base::ErrorCode::kDisconnected,
+                "AMQP connection is not ready");
+        }
+    }
+
+    std::shared_ptr<PendingPublishResult> pending(new PendingPublishResult());
+    foundation::base::Result<void> enqueue = EnqueueCommand(
+        [this, effective_request, pending]() {
+            if (!IsReadyLocked()) {
+                CompletePendingPublishResult(
+                    pending,
+                    foundation::base::Result<PublishReceipt>(
+                        foundation::base::ErrorCode::kDisconnected,
+                        "AMQP connection is not ready"));
+                return;
+            }
+
+            if (!publish_channel_ || !publisher_confirms_ready_) {
+                CompletePendingPublishResult(
+                    pending,
+                    foundation::base::Result<PublishReceipt>(
+                        foundation::base::ErrorCode::kNotSupported,
+                        "AMQP publisher confirms are not available"));
+                return;
+            }
+
+            const char* payload =
+                effective_request.payload.empty()
+                    ? ""
+                    : &effective_request.payload[0];
+            AMQP::Envelope envelope(payload, effective_request.payload.size());
+            foundation::base::Result<void> envelope_result =
+                FillEnvelope(effective_request, &envelope);
+            if (!envelope_result.IsOk()) {
+                CompletePendingPublishResult(
+                    pending,
+                    foundation::base::Result<PublishReceipt>(
+                        envelope_result.GetError(),
+                        envelope_result.GetMessage()));
+                return;
+            }
+
+            const std::uint64_t delivery_tag = next_publish_confirm_tag_;
+            bool published = publish_channel_->publish(
+                    effective_request.exchange,
+                    effective_request.routing_key,
+                    envelope,
+                    PublishFlags(effective_request));
+            if (!published) {
+                CompletePendingPublishResult(
+                    pending,
+                    foundation::base::Result<PublishReceipt>(
+                        foundation::base::ErrorCode::kOperationFailed,
+                        "AMQP publish command was rejected locally"));
+                return;
+            }
+
+            PendingPublishConfirm confirm;
+            confirm.request = effective_request;
+            confirm.result = pending;
+            pending_publish_confirms_[delivery_tag] = confirm;
+            ++next_publish_confirm_tag_;
+        });
+
+    if (!enqueue.IsOk()) {
+        return foundation::base::Result<PublishReceipt>(
+            enqueue.GetError(),
+            enqueue.GetMessage());
+    }
+
+    return WaitPendingPublishResult(pending, options.timeout_ms);
 }
 
 foundation::base::Result<void> RabbitMqConnectionDriver::DeclareExchange(
@@ -1659,7 +1864,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::DeclareExchange(
             if (!IsReadyLocked()) {
                 CompletePendingResult(
                     pending,
-                    MakeDisconnected("RabbitMQ connection is not ready"));
+                    MakeDisconnected("AMQP connection is not ready"));
                 return;
             }
 
@@ -1715,7 +1920,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::DeclareQueue(
             if (!IsReadyLocked()) {
                 CompletePendingResult(
                     pending,
-                    MakeDisconnected("RabbitMQ connection is not ready"));
+                    MakeDisconnected("AMQP connection is not ready"));
                 return;
             }
 
@@ -1771,7 +1976,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::BindQueue(
             if (!IsReadyLocked()) {
                 CompletePendingResult(
                     pending,
-                    MakeDisconnected("RabbitMQ connection is not ready"));
+                    MakeDisconnected("AMQP connection is not ready"));
                 return;
             }
 
@@ -1883,7 +2088,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::CompleteDeliveryAsync(
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!thread_.joinable() || stop_requested_) {
-            return MakeInvalidState("RabbitMQ connection driver is not running");
+            return MakeInvalidState("AMQP connection driver is not running");
         }
     }
 
@@ -1943,20 +2148,20 @@ void RabbitMqConnectionDriver::onData(AMQP::Connection*,
 }
 
 void RabbitMqConnectionDriver::onReady(AMQP::Connection*) {
-    FOUNDATION_LOG_INFO("RabbitMQ AMQP handshake completed");
+    FOUNDATION_LOG_INFO("AMQP handshake completed");
     handshake_ready_ = true;
-    StartBootstrap();
+    EnablePublisherConfirms();
 }
 
 void RabbitMqConnectionDriver::onError(AMQP::Connection*,
                                        const char* message) {
     RequestDisconnect(MakeErrorMessage(
-        "RabbitMQ connection error",
+        "AMQP connection error",
         message ? message : ""));
 }
 
 void RabbitMqConnectionDriver::onClosed(AMQP::Connection*) {
-    RequestDisconnect("RabbitMQ connection closed");
+    RequestDisconnect("AMQP connection closed");
 }
 
 std::uint16_t RabbitMqConnectionDriver::onNegotiate(AMQP::Connection*,
@@ -1968,7 +2173,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::EnqueueCommand(
     const std::function<void()>& command) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!thread_.joinable() || stop_requested_) {
-        return MakeInvalidState("RabbitMQ connection driver is not running");
+        return MakeInvalidState("AMQP connection driver is not running");
     }
 
     commands_.push_back(command);
@@ -2025,7 +2230,7 @@ void RabbitMqConnectionDriver::ThreadMain() {
         SleepFor(std::chrono::milliseconds(10));
     }
 
-    HandleDisconnect("RabbitMQ driver stopped");
+    HandleDisconnect("AMQP driver stopped");
 }
 
 bool RabbitMqConnectionDriver::ShouldStop() const {
@@ -2047,7 +2252,7 @@ bool RabbitMqConnectionDriver::ShouldAttemptReconnect() {
 }
 
 void RabbitMqConnectionDriver::ApplyReconnectBackoff(const std::string& error) {
-    FOUNDATION_LOG_WARNING("RabbitMQ connect attempt failed: " << error);
+    FOUNDATION_LOG_WARNING("AMQP connect attempt failed: " << error);
     std::lock_guard<std::mutex> lock(mutex_);
     last_error_ = error;
     state_ = config_.connection.reconnect.enabled
@@ -2068,7 +2273,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
     } catch (const std::exception& ex) {
         return foundation::base::Result<void>(
             foundation::base::ErrorCode::kInvalidArgument,
-            MakeErrorMessage("Invalid RabbitMQ URI", ex.what()));
+            MakeErrorMessage("Invalid AMQP URI", ex.what()));
     }
 
     std::ostringstream port_stream;
@@ -2095,7 +2300,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
     foundation::base::Result<void> result =
         foundation::base::Result<void>(
             foundation::base::ErrorCode::kIoError,
-            "Unable to connect to RabbitMQ broker at " +
+            "Unable to connect to AMQP broker at " +
                 address.hostname() + ":" + port_stream.str());
 
     for (struct addrinfo* current = results;
@@ -2112,7 +2317,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
             const int error_code = GetLastSocketErrorCode();
             result = foundation::base::Result<void>(
                 foundation::base::ErrorCode::kIoError,
-                "Unable to create socket for RabbitMQ broker at " +
+                "Unable to create socket for AMQP broker at " +
                     endpoint + ": " + FormatSocketError(error_code));
             continue;
         }
@@ -2129,7 +2334,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
             if (!ConnectInProgressError(error_code)) {
                 result = foundation::base::Result<void>(
                     foundation::base::ErrorCode::kIoError,
-                    "Immediate connect failure to RabbitMQ broker at " +
+                    "Immediate connect failure to AMQP broker at " +
                         endpoint + ": " + FormatSocketError(error_code));
                 CloseSocketHandle(&socket_fd);
                 continue;
@@ -2158,14 +2363,14 @@ foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
                 if (select_result == 0) {
                     result = foundation::base::Result<void>(
                         foundation::base::ErrorCode::kTimeout,
-                        "Timed out connecting to RabbitMQ broker at " +
+                        "Timed out connecting to AMQP broker at " +
                             endpoint + " after connect_timeout_ms=" +
                             std::to_string(config_.connection.connect_timeout_ms));
                 } else {
                     const int select_error = GetLastSocketErrorCode();
                     result = foundation::base::Result<void>(
                         foundation::base::ErrorCode::kIoError,
-                        "Connect select failed for RabbitMQ broker at " +
+                        "Connect select failed for AMQP broker at " +
                             endpoint + ": " + FormatSocketError(select_error));
                 }
                 CloseSocketHandle(&socket_fd);
@@ -2184,7 +2389,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
                 const int getsockopt_error = GetLastSocketErrorCode();
                 result = foundation::base::Result<void>(
                     foundation::base::ErrorCode::kIoError,
-                    "Failed to read connect status for RabbitMQ broker at " +
+                    "Failed to read connect status for AMQP broker at " +
                         endpoint + ": " + FormatSocketError(getsockopt_error));
                 CloseSocketHandle(&socket_fd);
                 continue;
@@ -2192,7 +2397,7 @@ foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
             if (socket_error != 0) {
                 result = foundation::base::Result<void>(
                     foundation::base::ErrorCode::kIoError,
-                    "Connect failed for RabbitMQ broker at " +
+                    "Connect failed for AMQP broker at " +
                         endpoint + ": " + FormatSocketError(socket_error));
                 CloseSocketHandle(&socket_fd);
                 continue;
@@ -2203,6 +2408,9 @@ foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
         connected_ = true;
         ready_ = false;
         handshake_ready_ = false;
+        publisher_confirms_ready_ = false;
+        next_publish_confirm_tag_ = 1;
+        pending_publish_confirms_.clear();
         pending_disconnect_ = false;
         pending_disconnect_reason_.clear();
         outbound_.clear();
@@ -2217,13 +2425,13 @@ foundation::base::Result<void> RabbitMqConnectionDriver::ConnectSocket() {
         admin_channel_.reset(new AMQP::Channel(connection_.get()));
         admin_channel_->onError([this](const char* message) {
             RequestDisconnect(MakeErrorMessage(
-                "RabbitMQ admin channel error",
+                "AMQP admin channel error",
                 message ? message : ""));
         });
         publish_channel_.reset(new AMQP::Channel(connection_.get()));
         publish_channel_->onError([this](const char* message) {
             RequestDisconnect(MakeErrorMessage(
-                "RabbitMQ publisher channel error",
+                "AMQP publisher channel error",
                 message ? message : ""));
         });
         publish_channel_->recall().onReceived(
@@ -2265,7 +2473,7 @@ void RabbitMqConnectionDriver::FlushOutboundData() {
         }
 
         RequestDisconnect(MakeErrorMessage(
-            "RabbitMQ socket send failed",
+            "AMQP socket send failed",
             GetLastSocketErrorMessage(error_code)));
         return;
     }
@@ -2296,7 +2504,7 @@ void RabbitMqConnectionDriver::PumpIncomingData() {
         NULL,
         &timeout);
     if (select_result < 0) {
-        RequestDisconnect("RabbitMQ socket select failed");
+        RequestDisconnect("AMQP socket select failed");
         return;
     }
     if (select_result == 0 || !FD_ISSET(socket_fd_, &read_set)) {
@@ -2306,7 +2514,7 @@ void RabbitMqConnectionDriver::PumpIncomingData() {
     char buffer[8192];
     int received = recv(socket_fd_, buffer, sizeof(buffer), 0);
     if (received == 0) {
-        RequestDisconnect("RabbitMQ broker closed the socket");
+        RequestDisconnect("AMQP broker closed the socket");
         return;
     }
     if (received < 0) {
@@ -2315,7 +2523,7 @@ void RabbitMqConnectionDriver::PumpIncomingData() {
             return;
         }
         RequestDisconnect(MakeErrorMessage(
-            "RabbitMQ socket receive failed",
+            "AMQP socket receive failed",
             GetLastSocketErrorMessage(error_code)));
         return;
     }
@@ -2370,16 +2578,19 @@ void RabbitMqConnectionDriver::DrainCommands() {
 
 bool RabbitMqConnectionDriver::IsReadyLocked() const {
     return connected_ && ready_ && admin_channel_.get() != NULL &&
-           publish_channel_.get() != NULL;
+           publish_channel_.get() != NULL &&
+           (!config_.publisher_confirms_enabled || publisher_confirms_ready_);
 }
 
 void RabbitMqConnectionDriver::RequestDisconnect(const std::string& reason) {
-    FOUNDATION_LOG_WARNING("RabbitMQ disconnect requested: " << reason);
+    FOUNDATION_LOG_WARNING("AMQP disconnect requested: " << reason);
     pending_disconnect_ = true;
     pending_disconnect_reason_ = reason;
 }
 
 void RabbitMqConnectionDriver::HandleDisconnect(const std::string& reason) {
+    FailPendingPublishes(reason);
+
     if (connection_) {
         connection_->fail(reason.c_str());
     }
@@ -2392,6 +2603,8 @@ void RabbitMqConnectionDriver::HandleDisconnect(const std::string& reason) {
     connected_ = false;
     ready_ = false;
     handshake_ready_ = false;
+    publisher_confirms_ready_ = false;
+    next_publish_confirm_tag_ = 1;
     pending_disconnect_ = false;
     outbound_.clear();
     inbound_.clear();
@@ -2414,8 +2627,53 @@ void RabbitMqConnectionDriver::HandleDisconnect(const std::string& reason) {
 }
 
 void RabbitMqConnectionDriver::StartBootstrap() {
-    FOUNDATION_LOG_INFO("RabbitMQ connection ready, rebuilding topology");
+    FOUNDATION_LOG_INFO("AMQP connection ready, rebuilding topology");
     BootstrapExchanges(0);
+}
+
+void RabbitMqConnectionDriver::EnablePublisherConfirms() {
+    if (!publish_channel_) {
+        RequestDisconnect("AMQP publisher channel is unavailable");
+        return;
+    }
+
+    if (!config_.publisher_confirms_enabled) {
+        FOUNDATION_LOG_INFO("AMQP publisher confirms disabled by config");
+        StartBootstrap();
+        return;
+    }
+
+    AMQP::DeferredConfirm& confirm = publish_channel_->confirmSelect();
+    confirm.onSuccess([this]() {
+        publisher_confirms_ready_ = true;
+        next_publish_confirm_tag_ = 1;
+        FOUNDATION_LOG_INFO("AMQP publisher confirms enabled");
+        StartBootstrap();
+    });
+    confirm.onAck([this](std::uint64_t delivery_tag, bool multiple) {
+        CompletePublishConfirm(
+            delivery_tag,
+            multiple,
+            PublishDisposition::BrokerAccepted,
+            0,
+            "");
+    });
+    confirm.onNack([this](
+            std::uint64_t delivery_tag,
+            bool multiple,
+            bool) {
+        CompletePublishConfirm(
+            delivery_tag,
+            multiple,
+            PublishDisposition::BrokerRejected,
+            0,
+            "Broker sent negative publisher acknowledgement");
+    });
+    confirm.onError([this](const char* message) {
+        RequestDisconnect(MakeErrorMessage(
+            "AMQP publisher confirms are not available",
+            message ? message : ""));
+    });
 }
 
 void RabbitMqConnectionDriver::BootstrapExchanges(std::size_t index) {
@@ -2426,7 +2684,7 @@ void RabbitMqConnectionDriver::BootstrapExchanges(std::size_t index) {
 
     const ExchangeSpec spec = config_.exchanges[index];
     FOUNDATION_LOG_INFO(
-        "RabbitMQ bootstrap declare exchange '" << spec.name
+        "AMQP bootstrap declare exchange '" << spec.name
         << "', passive=" << (spec.passive ? "true" : "false"));
     foundation::base::Result<AMQP::Table> arguments =
         ConfigObjectToAmqpTable(spec.arguments);
@@ -2442,7 +2700,7 @@ void RabbitMqConnectionDriver::BootstrapExchanges(std::size_t index) {
         arguments.Value())
         .onSuccess([this, spec, index]() {
             FOUNDATION_LOG_INFO(
-                "RabbitMQ bootstrap declared exchange '" << spec.name << "'");
+                "AMQP bootstrap declared exchange '" << spec.name << "'");
             BootstrapExchanges(index + 1);
         })
         .onError([this, spec](const char* message) {
@@ -2460,7 +2718,7 @@ void RabbitMqConnectionDriver::BootstrapQueues(std::size_t index) {
 
     const QueueSpec spec = config_.queues[index];
     FOUNDATION_LOG_INFO(
-        "RabbitMQ bootstrap declare queue '" << spec.name
+        "AMQP bootstrap declare queue '" << spec.name
         << "', passive=" << (spec.passive ? "true" : "false")
         << ", exclusive=" << (spec.exclusive ? "true" : "false")
         << ", auto_delete=" << (spec.auto_delete ? "true" : "false"));
@@ -2477,7 +2735,7 @@ void RabbitMqConnectionDriver::BootstrapQueues(std::size_t index) {
         arguments.Value())
         .onSuccess([this, spec, index](const std::string&, uint32_t, uint32_t) {
             FOUNDATION_LOG_INFO(
-                "RabbitMQ bootstrap declared queue '" << spec.name << "'");
+                "AMQP bootstrap declared queue '" << spec.name << "'");
             BootstrapQueues(index + 1);
         })
         .onError([this, spec](const char* message) {
@@ -2495,7 +2753,7 @@ void RabbitMqConnectionDriver::BootstrapBindings(std::size_t index) {
 
     const BindingSpec spec = config_.bindings[index];
     FOUNDATION_LOG_INFO(
-        "RabbitMQ bootstrap bind queue '" << spec.queue
+        "AMQP bootstrap bind queue '" << spec.queue
         << "' to exchange '" << spec.exchange
         << "' routing_key='" << spec.routing_key << "'");
     foundation::base::Result<AMQP::Table> arguments =
@@ -2512,7 +2770,7 @@ void RabbitMqConnectionDriver::BootstrapBindings(std::size_t index) {
         arguments.Value())
         .onSuccess([this, spec, index]() {
             FOUNDATION_LOG_INFO(
-                "RabbitMQ bootstrap bound queue '" << spec.queue
+                "AMQP bootstrap bound queue '" << spec.queue
                 << "' to exchange '" << spec.exchange << "'");
             BootstrapBindings(index + 1);
         })
@@ -2528,13 +2786,13 @@ void RabbitMqConnectionDriver::BootstrapConsumers(std::size_t index) {
         std::lock_guard<std::mutex> lock(mutex_);
         state_ = ConnectionState::Connected;
         ready_ = true;
-        FOUNDATION_LOG_INFO("RabbitMQ topology rebuild completed");
+        FOUNDATION_LOG_INFO("AMQP topology rebuild completed");
         return;
     }
 
     const ConsumerSpec spec = config_.consumers[index];
     FOUNDATION_LOG_INFO(
-        "RabbitMQ bootstrap start consumer '" << spec.name
+        "AMQP bootstrap start consumer '" << spec.name
         << "' queue='" << spec.queue
         << "' prefetch=" << spec.prefetch_count);
     ConsumerRuntime& runtime = consumer_runtimes_[spec.name];
@@ -2552,7 +2810,7 @@ void RabbitMqConnectionDriver::BootstrapConsumers(std::size_t index) {
         runtime.channel->setQos(spec.prefetch_count)
             .onSuccess([this, spec, index]() {
                 FOUNDATION_LOG_INFO(
-                    "RabbitMQ bootstrap applied qos for consumer '"
+                    "AMQP bootstrap applied qos for consumer '"
                     << spec.name << "'");
                 StartConsumer(index);
             })
@@ -2596,7 +2854,7 @@ void RabbitMqConnectionDriver::StartConsumer(std::size_t index) {
                 runtime->second.active = true;
             }
             FOUNDATION_LOG_INFO(
-                "RabbitMQ bootstrap consumer '" << spec.name
+                "AMQP bootstrap consumer '" << spec.name
                 << "' started with tag '" << tag << "'");
             BootstrapConsumers(index + 1);
         })
@@ -2608,7 +2866,7 @@ void RabbitMqConnectionDriver::StartConsumer(std::size_t index) {
         })
         .onCancelled([this, spec](const std::string&) {
             RequestDisconnect(
-                "RabbitMQ consumer '" + spec.name + "' was cancelled by broker");
+                "AMQP consumer '" + spec.name + "' was cancelled by broker");
         })
         .onError([this, spec](const char* message) {
             RequestDisconnect(MakeErrorMessage(
@@ -2617,13 +2875,136 @@ void RabbitMqConnectionDriver::StartConsumer(std::size_t index) {
         });
 }
 
+void RabbitMqConnectionDriver::CompletePublishConfirm(
+    std::uint64_t delivery_tag,
+    bool multiple,
+    PublishDisposition disposition,
+    int reply_code,
+    const std::string& reply_text) {
+    if (pending_publish_confirms_.empty()) {
+        return;
+    }
+
+    std::vector<std::uint64_t> completed_tags;
+    if (multiple) {
+        for (std::map<std::uint64_t, PendingPublishConfirm>::const_iterator it =
+                 pending_publish_confirms_.begin();
+             it != pending_publish_confirms_.end() && it->first <= delivery_tag;
+             ++it) {
+            completed_tags.push_back(it->first);
+        }
+    } else if (pending_publish_confirms_.find(delivery_tag) !=
+               pending_publish_confirms_.end()) {
+        completed_tags.push_back(delivery_tag);
+    }
+
+    for (std::size_t index = 0; index < completed_tags.size(); ++index) {
+        std::map<std::uint64_t, PendingPublishConfirm>::iterator it =
+            pending_publish_confirms_.find(completed_tags[index]);
+        if (it == pending_publish_confirms_.end()) {
+            continue;
+        }
+
+        PublishReceipt receipt;
+        if (it->second.returned) {
+            receipt.disposition = PublishDisposition::Returned;
+            receipt.reply_code = it->second.reply_code;
+            receipt.reply_text = it->second.reply_text;
+        } else {
+            receipt.disposition = disposition;
+            receipt.reply_code = reply_code;
+            receipt.reply_text = reply_text;
+        }
+
+        CompletePendingPublishResult(
+            it->second.result,
+            foundation::base::Result<PublishReceipt>(receipt));
+        pending_publish_confirms_.erase(it);
+    }
+}
+
+void RabbitMqConnectionDriver::FailPendingPublishes(const std::string& reason) {
+    if (pending_publish_confirms_.empty()) {
+        return;
+    }
+
+    const std::string message = reason.empty()
+        ? std::string("AMQP connection closed before publisher confirm")
+        : reason;
+    std::map<std::uint64_t, PendingPublishConfirm> pending;
+    pending.swap(pending_publish_confirms_);
+
+    for (std::map<std::uint64_t, PendingPublishConfirm>::iterator it =
+             pending.begin();
+         it != pending.end();
+         ++it) {
+        CompletePendingPublishResult(
+            it->second.result,
+            foundation::base::Result<PublishReceipt>(
+                foundation::base::ErrorCode::kDisconnected,
+                message));
+    }
+}
+
+bool RabbitMqConnectionDriver::MarkReturnedPublish(
+    const AMQP::Message& message,
+    int16_t code,
+    const std::string& description) {
+    for (std::map<std::uint64_t, PendingPublishConfirm>::iterator it =
+             pending_publish_confirms_.begin();
+         it != pending_publish_confirms_.end();
+         ++it) {
+        PendingPublishConfirm& pending = it->second;
+        if (pending.returned || !pending.request.mandatory) {
+            continue;
+        }
+        if (pending.request.exchange != message.exchange() ||
+            pending.request.routing_key != message.routingkey()) {
+            continue;
+        }
+        if (pending.request.payload.size() != message.bodySize()) {
+            continue;
+        }
+        if (!pending.request.payload.empty() &&
+            std::memcmp(
+                &pending.request.payload[0],
+                message.body(),
+                pending.request.payload.size()) != 0) {
+            continue;
+        }
+        if (!pending.request.content_type.empty() &&
+            pending.request.content_type != message.contentType()) {
+            continue;
+        }
+        if (!pending.request.correlation_id.empty() &&
+            pending.request.correlation_id != message.correlationID()) {
+            continue;
+        }
+        if (!pending.request.reply_to.empty() &&
+            pending.request.reply_to != message.replyTo()) {
+            continue;
+        }
+
+        pending.returned = true;
+        pending.reply_code = static_cast<int>(code);
+        pending.reply_text = description;
+        return true;
+    }
+
+    return false;
+}
+
 void RabbitMqConnectionDriver::HandleReturnedMessage(
     const AMQP::Message& message,
     int16_t code,
     const std::string& description) {
+    if (MarkReturnedPublish(message, code, description)) {
+        return;
+    }
+
     const std::string correlation_id = message.correlationID();
     FOUNDATION_LOG_WARNING(
-        "RabbitMQ returned mandatory publish"
+        "AMQP broker returned mandatory publish"
         << (correlation_id.empty()
                 ? std::string("")
                 : std::string(" correlation_id='") + correlation_id + "'")
@@ -2680,7 +3061,7 @@ foundation::base::Result<void> PublishWithDriver(
     const std::shared_ptr<RabbitMqConnectionDriver>& driver,
     const PublishRequest& request) {
     if (!driver) {
-        return MakeDisconnected("RabbitMQ bus module is not started");
+        return MakeDisconnected("AMQP bus module is not started");
     }
 
     return driver->Publish(request);
@@ -2690,17 +3071,30 @@ foundation::base::Result<void> PublishAsyncWithDriver(
     const std::shared_ptr<RabbitMqConnectionDriver>& driver,
     const PublishRequest& request) {
     if (!driver) {
-        return MakeDisconnected("RabbitMQ bus module is not started");
+        return MakeDisconnected("AMQP bus module is not started");
     }
 
     return driver->PublishAsync(request);
+}
+
+foundation::base::Result<PublishReceipt> PublishConfirmedWithDriver(
+    const std::shared_ptr<RabbitMqConnectionDriver>& driver,
+    const PublishRequest& request,
+    const PublishConfirmOptions& options) {
+    if (!driver) {
+        return foundation::base::Result<PublishReceipt>(
+            foundation::base::ErrorCode::kDisconnected,
+            "AMQP bus module is not started");
+    }
+
+    return driver->PublishConfirmed(request, options);
 }
 
 foundation::base::Result<void> DeclareExchangeWithDriver(
     const std::shared_ptr<RabbitMqConnectionDriver>& driver,
     const ExchangeSpec& spec) {
     if (!driver) {
-        return MakeDisconnected("RabbitMQ bus module is not started");
+        return MakeDisconnected("AMQP bus module is not started");
     }
 
     return driver->DeclareExchange(spec);
@@ -2710,7 +3104,7 @@ foundation::base::Result<void> DeclareQueueWithDriver(
     const std::shared_ptr<RabbitMqConnectionDriver>& driver,
     const QueueSpec& spec) {
     if (!driver) {
-        return MakeDisconnected("RabbitMQ bus module is not started");
+        return MakeDisconnected("AMQP bus module is not started");
     }
 
     return driver->DeclareQueue(spec);
@@ -2720,7 +3114,7 @@ foundation::base::Result<void> BindQueueWithDriver(
     const std::shared_ptr<RabbitMqConnectionDriver>& driver,
     const BindingSpec& spec) {
     if (!driver) {
-        return MakeDisconnected("RabbitMQ bus module is not started");
+        return MakeDisconnected("AMQP bus module is not started");
     }
 
     return driver->BindQueue(spec);
@@ -2735,6 +3129,18 @@ ConnectionState GetConnectionStateFromDriver(
     return driver->GetConnectionState();
 }
 
+bool SupportsFeatureFromDriver(
+    const std::shared_ptr<RabbitMqConnectionDriver>&,
+    MessageBusFeature feature) {
+    switch (feature) {
+        case MessageBusFeature::PublisherConfirm:
+        case MessageBusFeature::MandatoryReturn:
+            return true;
+        default:
+            return false;
+    }
+}
+
 RabbitMqBusModule::RabbitMqBusModule()
     : shared_state_(new RabbitMqBusSharedState()),
       service_proxy_(new MessageBusServiceProxy(shared_state_)) {
@@ -2744,7 +3150,13 @@ RabbitMqBusModule::~RabbitMqBusModule() {
 }
 
 std::string RabbitMqBusModule::ModuleType() const {
-    return "rabbitmq_bus";
+    return "amqp_bus";
+}
+
+std::vector<std::string> RabbitMqBusModule::ModuleTypeAliases() const {
+    std::vector<std::string> aliases;
+    aliases.push_back("rabbitmq_bus");
+    return aliases;
 }
 
 std::string RabbitMqBusModule::ModuleVersion() const {
@@ -2759,6 +3171,12 @@ foundation::base::Result<void> RabbitMqBusModule::Publish(
 foundation::base::Result<void> RabbitMqBusModule::PublishAsync(
     const PublishRequest& request) {
     return service_proxy_->PublishAsync(request);
+}
+
+foundation::base::Result<PublishReceipt> RabbitMqBusModule::PublishConfirmed(
+    const PublishRequest& request,
+    const PublishConfirmOptions& options) {
+    return service_proxy_->PublishConfirmed(request, options);
 }
 
 foundation::base::Result<void> RabbitMqBusModule::RegisterConsumerHandler(
@@ -2789,6 +3207,10 @@ foundation::base::Result<void> RabbitMqBusModule::BindQueue(
 
 ConnectionState RabbitMqBusModule::GetConnectionState() const {
     return service_proxy_->GetConnectionState();
+}
+
+bool RabbitMqBusModule::SupportsFeature(MessageBusFeature feature) const {
+    return service_proxy_->SupportsFeature(feature);
 }
 
 foundation::base::Result<void> RabbitMqBusModule::OnInit() {
@@ -2849,10 +3271,10 @@ foundation::base::Result<void> RabbitMqBusModule::OnStart() {
     }
 
     if (!worker_pool) {
-        return MakeInvalidState("RabbitMQ bus module is not initialized");
+        return MakeInvalidState("AMQP bus module is not initialized");
     }
     if (!config) {
-        return MakeInvalidState("RabbitMQ bus configuration is unavailable");
+        return MakeInvalidState("AMQP bus configuration is unavailable");
     }
 
     foundation::base::Result<void> pool_start = worker_pool->Start();
@@ -2888,7 +3310,7 @@ foundation::base::Result<void> RabbitMqBusModule::OnStart() {
                             driver_ref->CompleteDeliveryAsync(
                                 delivery,
                                 ConsumeAction::Requeue),
-                            "Requeue message because RabbitMQ bus is stopping");
+                            "Requeue message because AMQP bus is stopping");
                     }
                     return;
                 }

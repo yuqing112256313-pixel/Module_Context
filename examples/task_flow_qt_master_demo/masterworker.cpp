@@ -444,8 +444,8 @@ bool MasterWorker::WriteMasterModuleConfig(
     QString* error_message) const {
     QJsonObject bus;
     bus.insert("name", "task_flow_master_bus");
-    bus.insert("type", "rabbitmq_bus");
-    bus.insert("library_path", ResolvePluginPath(settings, "rabbitmq_bus.dll"));
+    bus.insert("type", "amqp_bus");
+    bus.insert("library_path", ResolvePluginPath(settings, "amqp_bus.dll"));
 
     QJsonObject bus_config;
     bus_config.insert("connection", ConnectionConfig(BuildRabbitMqUri(settings)));
@@ -540,8 +540,8 @@ bool MasterWorker::WriteLocalWorkerModuleConfig(
 
     QJsonObject bus;
     bus.insert("name", "task_flow_local_worker_bus_" + safe_worker_id);
-    bus.insert("type", "rabbitmq_bus");
-    bus.insert("library_path", ResolvePluginPath(settings, "rabbitmq_bus.dll"));
+    bus.insert("type", "amqp_bus");
+    bus.insert("library_path", ResolvePluginPath(settings, "amqp_bus.dll"));
 
     QJsonObject bus_config;
     bus_config.insert("connection", ConnectionConfig(BuildWorkerRabbitMqUri(settings)));

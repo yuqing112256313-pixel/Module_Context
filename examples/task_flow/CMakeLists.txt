@@ -20,10 +20,10 @@ function(mc_configure_task_flow_example_target target)
         )
     endif()
 
-    if(WIN32 AND TARGET rabbitmq_bus)
+    if(WIN32 AND TARGET amqp_bus)
         add_custom_command(TARGET ${target} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_FILE:rabbitmq_bus>
+                $<TARGET_FILE:amqp_bus>
                 $<TARGET_FILE_DIR:${target}>
         )
     endif()
@@ -54,9 +54,9 @@ function(mc_configure_task_flow_example_target target)
 
 endfunction()
 
-if(NOT TARGET rabbitmq_bus)
+if(NOT TARGET amqp_bus)
     message(FATAL_ERROR
-        "examples/task_flow requires rabbitmq_bus. Enable MC_BUILD_RABBITMQ_MODULE.")
+        "examples/task_flow requires amqp_bus. Enable MC_BUILD_AMQP_BUS_MODULE.")
 endif()
 if(NOT TARGET http_transport)
     message(FATAL_ERROR

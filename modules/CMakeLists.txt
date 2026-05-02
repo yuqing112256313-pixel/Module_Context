@@ -85,7 +85,7 @@ function(mc_ensure_amqp_dependency)
     FetchContent_MakeAvailable(amqpcpp)
 endfunction()
 
-if(MC_BUILD_RABBITMQ_MODULE)
+if(MC_BUILD_AMQP_BUS_MODULE OR MC_BUILD_RABBITMQ_MODULE)
     mc_ensure_amqp_dependency()
 
     if(NOT TARGET amqpcpp)

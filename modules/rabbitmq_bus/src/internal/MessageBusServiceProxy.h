@@ -26,6 +26,9 @@ public:
         const PublishRequest& request) override;
     foundation::base::Result<void> PublishAsync(
         const PublishRequest& request) override;
+    foundation::base::Result<PublishReceipt> PublishConfirmed(
+        const PublishRequest& request,
+        const PublishConfirmOptions& options) override;
     foundation::base::Result<void> RegisterConsumerHandler(
         const std::string& consumer_name,
         MessageHandler handler) override;
@@ -38,6 +41,7 @@ public:
     foundation::base::Result<void> BindQueue(
         const BindingSpec& spec) override;
     ConnectionState GetConnectionState() const override;
+    bool SupportsFeature(MessageBusFeature feature) const override;
 
 private:
     // 不拥有具体 driver，只持有共享状态以便每次调用查找当前 driver。

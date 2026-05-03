@@ -151,8 +151,14 @@ pwsh -ExecutionPolicy Bypass -File H:\Codex\Module_Context\scripts\ecs\Start-Rab
 Run the E2E gate:
 
 ```powershell
+cmake --build --preset windows-vs2015-x64-qt597-debug --config Debug --target mc_task_flow_master_host
+cmake --build --preset windows-vs2015-x64-qt597-debug --config Debug --target mc_task_flow_worker_host
 ctest --preset windows-vs2015-x64-qt597-debug -R mc_amqp_task_flow_e2e --output-on-failure
 ```
+
+`mc_amqp_task_flow_e2e` is a CTest name, not a Visual Studio build target.
+Build the master/worker host targets above before running the test when source
+files changed.
 
 The RabbitMQ service runs outside the SSH user session, so
 `rabbitmqctl`/`rabbitmq-diagnostics` can fail Erlang cookie auth while the

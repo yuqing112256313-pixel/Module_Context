@@ -44,6 +44,10 @@ public:
         MessageHandler handler) override;
     foundation::base::Result<void> UnregisterConsumerHandler(
         const std::string& consumer_name) override;
+    foundation::base::Result<void> StartConsumer(
+        const std::string& consumer_name) override;
+    foundation::base::Result<void> StopConsumer(
+        const std::string& consumer_name) override;
     foundation::base::Result<void> RegisterConnectionStateHandler(
         const std::string& handler_name,
         ConnectionStateHandler handler) override;

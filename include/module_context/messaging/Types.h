@@ -163,6 +163,7 @@ struct MC_FRAMEWORK_API ConsumerSpec {
     std::string name;
     std::string queue;
     std::string consumer_tag;
+    bool auto_start;
     bool auto_ack;
     bool exclusive;
     bool no_local;
@@ -173,6 +174,7 @@ struct MC_FRAMEWORK_API ConsumerSpec {
         : name(),
           queue(),
           consumer_tag(),
+          auto_start(true),
           auto_ack(false),
           exclusive(false),
           no_local(false),

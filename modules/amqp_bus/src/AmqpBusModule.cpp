@@ -132,6 +132,16 @@ foundation::base::Result<void> AmqpBusModule::UnregisterConsumerHandler(
     return service_proxy_->UnregisterConsumerHandler(consumer_name);
 }
 
+foundation::base::Result<void> AmqpBusModule::StartConsumer(
+    const std::string& consumer_name) {
+    return service_proxy_->StartConsumer(consumer_name);
+}
+
+foundation::base::Result<void> AmqpBusModule::StopConsumer(
+    const std::string& consumer_name) {
+    return service_proxy_->StopConsumer(consumer_name);
+}
+
 foundation::base::Result<void> AmqpBusModule::RegisterConnectionStateHandler(
     const std::string& handler_name,
     ConnectionStateHandler handler) {

@@ -940,6 +940,8 @@ foundation::base::Result<ConsumerSpec> ParseConsumerSpec(
         GetRequiredStringField(value, "queue");
     foundation::base::Result<std::string> consumer_tag =
         GetOptionalStringField(value, "consumer_tag", "");
+    foundation::base::Result<bool> auto_start =
+        GetOptionalBoolField(value, "auto_start", true);
     foundation::base::Result<bool> auto_ack =
         GetOptionalBoolField(value, "auto_ack", false);
     foundation::base::Result<bool> exclusive =
@@ -952,8 +954,8 @@ foundation::base::Result<ConsumerSpec> ParseConsumerSpec(
         GetOptionalArgumentsField(value, "arguments");
 
     if (!name.IsOk() || !queue.IsOk() || !consumer_tag.IsOk() ||
-        !auto_ack.IsOk() || !exclusive.IsOk() || !no_local.IsOk() ||
-        !prefetch_count.IsOk() || !arguments.IsOk()) {
+        !auto_start.IsOk() || !auto_ack.IsOk() || !exclusive.IsOk() ||
+        !no_local.IsOk() || !prefetch_count.IsOk() || !arguments.IsOk()) {
         return foundation::base::Result<ConsumerSpec>(
             foundation::base::ErrorCode::kParseError,
             "Invalid consumer specification");
@@ -970,6 +972,7 @@ foundation::base::Result<ConsumerSpec> ParseConsumerSpec(
     spec.name = name.Value();
     spec.queue = queue.Value();
     spec.consumer_tag = consumer_tag.Value();
+    spec.auto_start = auto_start.Value();
     spec.auto_ack = auto_ack.Value();
     spec.exclusive = exclusive.Value();
     spec.no_local = no_local.Value();
@@ -1476,6 +1479,10 @@ public:
     foundation::base::Result<PublishReceipt> PublishConfirmed(
         const PublishRequest& request,
         const PublishConfirmOptions& options);
+    foundation::base::Result<void> StartConsumer(
+        const std::string& consumer_name);
+    foundation::base::Result<void> StopConsumer(
+        const std::string& consumer_name);
     foundation::base::Result<void> DeclareExchange(const ExchangeSpec& spec);
     foundation::base::Result<void> DeclareQueue(const QueueSpec& spec);
     foundation::base::Result<void> BindQueue(const BindingSpec& spec);
@@ -1520,7 +1527,11 @@ private:
     void BootstrapQueues(std::size_t index);
     void BootstrapBindings(std::size_t index);
     void BootstrapConsumers(std::size_t index);
-    void StartConsumer(std::size_t index);
+    void StartBootstrapConsumer(std::size_t index);
+    void StartConsumerRuntime(
+        const ConsumerSpec& spec,
+        const std::function<void()>& on_success,
+        const std::function<void(const std::string&)>& on_error);
     foundation::base::Result<void> FillEnvelope(
         const PublishRequest& request,
         AMQP::Envelope* envelope) const;
@@ -1938,6 +1949,146 @@ foundation::base::Result<PublishReceipt> AmqpConnectionDriver::PublishConfirmed(
     }
 
     return WaitPendingPublishResult(pending, options.timeout_ms);
+}
+
+foundation::base::Result<void> AmqpConnectionDriver::StartConsumer(
+    const std::string& consumer_name) {
+    if (consumer_name.empty()) {
+        return MakeInvalidArgument("consumer_name must not be empty");
+    }
+
+    std::shared_ptr<PendingResult> pending(new PendingResult());
+    foundation::base::Result<void> enqueue = EnqueueCommand(
+        [this, consumer_name, pending]() {
+            if (!IsReadyLocked()) {
+                CompletePendingResult(
+                    pending,
+                    MakeDisconnected("AMQP connection is not ready"));
+                return;
+            }
+
+            ConsumerSpec spec;
+            bool found = false;
+            for (std::size_t index = 0; index < config_.consumers.size(); ++index) {
+                if (config_.consumers[index].name == consumer_name) {
+                    spec = config_.consumers[index];
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                CompletePendingResult(
+                    pending,
+                    foundation::base::Result<void>(
+                        foundation::base::ErrorCode::kNotFound,
+                        "Unknown consumer '" + consumer_name + "'"));
+                return;
+            }
+
+            std::map<std::string, ConsumerRuntime>::iterator runtime =
+                consumer_runtimes_.find(consumer_name);
+            if (runtime == consumer_runtimes_.end() || !runtime->second.channel) {
+                CompletePendingResult(
+                    pending,
+                    MakeDisconnected(
+                        "Consumer runtime is unavailable for '" +
+                        consumer_name + "'"));
+                return;
+            }
+            if (runtime->second.active) {
+                CompletePendingResult(pending, foundation::base::MakeSuccess());
+                return;
+            }
+
+            StartConsumerRuntime(
+                spec,
+                [pending]() {
+                    CompletePendingResult(
+                        pending,
+                        foundation::base::MakeSuccess());
+                },
+                [pending, consumer_name](const std::string& message) {
+                    CompletePendingResult(
+                        pending,
+                        foundation::base::Result<void>(
+                            foundation::base::ErrorCode::kOperationFailed,
+                            MakeErrorMessage(
+                                "StartConsumer failed for '" +
+                                    consumer_name + "'",
+                                message)));
+                });
+        });
+
+    if (!enqueue.IsOk()) {
+        return enqueue;
+    }
+
+    return WaitPendingResult(pending);
+}
+
+foundation::base::Result<void> AmqpConnectionDriver::StopConsumer(
+    const std::string& consumer_name) {
+    if (consumer_name.empty()) {
+        return MakeInvalidArgument("consumer_name must not be empty");
+    }
+
+    std::shared_ptr<PendingResult> pending(new PendingResult());
+    foundation::base::Result<void> enqueue = EnqueueCommand(
+        [this, consumer_name, pending]() {
+            if (!IsReadyLocked()) {
+                CompletePendingResult(
+                    pending,
+                    MakeDisconnected("AMQP connection is not ready"));
+                return;
+            }
+
+            std::map<std::string, ConsumerRuntime>::iterator runtime =
+                consumer_runtimes_.find(consumer_name);
+            if (runtime == consumer_runtimes_.end() || !runtime->second.channel) {
+                CompletePendingResult(
+                    pending,
+                    foundation::base::Result<void>(
+                        foundation::base::ErrorCode::kNotFound,
+                        "Unknown consumer '" + consumer_name + "'"));
+                return;
+            }
+            if (!runtime->second.active || runtime->second.active_tag.empty()) {
+                runtime->second.active = false;
+                runtime->second.active_tag.clear();
+                CompletePendingResult(pending, foundation::base::MakeSuccess());
+                return;
+            }
+
+            const std::string active_tag = runtime->second.active_tag;
+            runtime->second.channel->cancel(active_tag)
+                .onSuccess([this, consumer_name, pending](const std::string&) {
+                    std::map<std::string, ConsumerRuntime>::iterator runtime =
+                        consumer_runtimes_.find(consumer_name);
+                    if (runtime != consumer_runtimes_.end()) {
+                        runtime->second.active = false;
+                        runtime->second.active_tag.clear();
+                    }
+                    CompletePendingResult(
+                        pending,
+                        foundation::base::MakeSuccess());
+                })
+                .onError([pending, consumer_name](const char* message) {
+                    CompletePendingResult(
+                        pending,
+                        foundation::base::Result<void>(
+                            foundation::base::ErrorCode::kOperationFailed,
+                            MakeErrorMessage(
+                                "StopConsumer failed for '" +
+                                    consumer_name + "'",
+                                message ? message : "")));
+                });
+        });
+
+    if (!enqueue.IsOk()) {
+        return enqueue;
+    }
+
+    return WaitPendingResult(pending);
 }
 
 foundation::base::Result<void> AmqpConnectionDriver::DeclareExchange(
@@ -2946,7 +3097,14 @@ void AmqpConnectionDriver::BootstrapConsumers(std::size_t index) {
                 FOUNDATION_LOG_INFO(
                     "AMQP bootstrap applied qos for consumer '"
                     << spec.name << "'");
-                StartConsumer(index);
+                if (spec.auto_start) {
+                    StartBootstrapConsumer(index);
+                } else {
+                    FOUNDATION_LOG_INFO(
+                        "AMQP bootstrap prepared consumer '"
+                        << spec.name << "' without auto start");
+                    BootstrapConsumers(index + 1);
+                }
             })
             .onError([this, spec](const char* message) {
                 RequestDisconnect(MakeErrorMessage(
@@ -2954,24 +3112,46 @@ void AmqpConnectionDriver::BootstrapConsumers(std::size_t index) {
                     message ? message : ""));
             });
     } else {
-        StartConsumer(index);
+        if (spec.auto_start) {
+            StartBootstrapConsumer(index);
+        } else {
+            FOUNDATION_LOG_INFO(
+                "AMQP bootstrap prepared consumer '"
+                << spec.name << "' without auto start");
+            BootstrapConsumers(index + 1);
+        }
     }
 }
 
-void AmqpConnectionDriver::StartConsumer(std::size_t index) {
+void AmqpConnectionDriver::StartBootstrapConsumer(std::size_t index) {
     const ConsumerSpec spec = config_.consumers[index];
+    StartConsumerRuntime(
+        spec,
+        [this, index]() {
+            BootstrapConsumers(index + 1);
+        },
+        [this, spec](const std::string& message) {
+            RequestDisconnect(MakeErrorMessage(
+                "Failed to start consumer '" + spec.name + "'",
+                message));
+        });
+}
+
+void AmqpConnectionDriver::StartConsumerRuntime(
+    const ConsumerSpec& spec,
+    const std::function<void()>& on_success,
+    const std::function<void(const std::string&)>& on_error) {
     std::map<std::string, ConsumerRuntime>::iterator runtime_it =
         consumer_runtimes_.find(spec.name);
     if (runtime_it == consumer_runtimes_.end() || !runtime_it->second.channel) {
-        RequestDisconnect(
-            "Consumer runtime missing when starting consumer '" + spec.name + "'");
+        on_error("Consumer runtime missing");
         return;
     }
 
     foundation::base::Result<AMQP::Table> arguments =
         ConfigObjectToAmqpTable(spec.arguments);
     if (!arguments.IsOk()) {
-        RequestDisconnect(arguments.GetMessage());
+        on_error(arguments.GetMessage());
         return;
     }
 
@@ -2980,7 +3160,7 @@ void AmqpConnectionDriver::StartConsumer(std::size_t index) {
         spec.consumer_tag,
         ToConsumeFlags(spec),
         arguments.Value())
-        .onSuccess([this, spec, index](const std::string& tag) {
+        .onSuccess([this, spec, on_success](const std::string& tag) {
             std::map<std::string, ConsumerRuntime>::iterator runtime =
                 consumer_runtimes_.find(spec.name);
             if (runtime != consumer_runtimes_.end()) {
@@ -2988,9 +3168,9 @@ void AmqpConnectionDriver::StartConsumer(std::size_t index) {
                 runtime->second.active = true;
             }
             FOUNDATION_LOG_INFO(
-                "AMQP bootstrap consumer '" << spec.name
+                "AMQP consumer '" << spec.name
                 << "' started with tag '" << tag << "'");
-            BootstrapConsumers(index + 1);
+            on_success();
         })
         .onReceived([this, spec](
             const AMQP::Message& message,
@@ -3002,10 +3182,8 @@ void AmqpConnectionDriver::StartConsumer(std::size_t index) {
             RequestDisconnect(
                 "AMQP consumer '" + spec.name + "' was cancelled by broker");
         })
-        .onError([this, spec](const char* message) {
-            RequestDisconnect(MakeErrorMessage(
-                "Failed to start consumer '" + spec.name + "'",
-                message ? message : ""));
+        .onError([on_error](const char* message) {
+            on_error(message ? message : "");
         });
 }
 
@@ -3250,6 +3428,26 @@ foundation::base::Result<PublishReceipt> PublishConfirmedWithDriver(
     }
 
     return driver->PublishConfirmed(request, options);
+}
+
+foundation::base::Result<void> StartConsumerWithDriver(
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
+    const std::string& consumer_name) {
+    if (!driver) {
+        return MakeDisconnected("AMQP bus module is not started");
+    }
+
+    return driver->StartConsumer(consumer_name);
+}
+
+foundation::base::Result<void> StopConsumerWithDriver(
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
+    const std::string& consumer_name) {
+    if (!driver) {
+        return MakeDisconnected("AMQP bus module is not started");
+    }
+
+    return driver->StopConsumer(consumer_name);
 }
 
 foundation::base::Result<void> DeclareExchangeWithDriver(

@@ -57,6 +57,12 @@ foundation::base::Result<PublishReceipt> PublishConfirmedWithDriver(
     const std::shared_ptr<AmqpConnectionDriver>& driver,
     const PublishRequest& request,
     const PublishConfirmOptions& options);
+foundation::base::Result<void> StartConsumerWithDriver(
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
+    const std::string& consumer_name);
+foundation::base::Result<void> StopConsumerWithDriver(
+    const std::shared_ptr<AmqpConnectionDriver>& driver,
+    const std::string& consumer_name);
 foundation::base::Result<void> DeclareExchangeWithDriver(
     const std::shared_ptr<AmqpConnectionDriver>& driver,
     const ExchangeSpec& spec);

@@ -95,6 +95,7 @@ ConfigValue MakeConsumer(const std::string& name,
     ConfigValue consumer = ConfigValue::MakeObject();
     SetField(&consumer, "name", ConfigValue(name));
     SetField(&consumer, "queue", ConfigValue(queue));
+    SetField(&consumer, "auto_start", ConfigValue(true));
     SetField(&consumer, "prefetch_count", ConfigValue(prefetch_count));
     SetField(&consumer, "auto_ack", ConfigValue(false));
     return consumer;
@@ -298,6 +299,26 @@ bool RunLifecycleCase() {
     foundation::base::Result<void> unregister_result =
         bus_api->UnregisterConsumerHandler("task_worker");
     if (!Expect(unregister_result.IsOk(), "UnregisterConsumerHandler should succeed")) {
+        return false;
+    }
+
+    foundation::base::Result<void> start_consumer_before_start =
+        bus_api->StartConsumer("task_worker");
+    if (!Expect(
+            !start_consumer_before_start.IsOk() &&
+                start_consumer_before_start.GetError() ==
+                    foundation::base::ErrorCode::kDisconnected,
+            "StartConsumer before Start should return kDisconnected")) {
+        return false;
+    }
+
+    foundation::base::Result<void> stop_consumer_before_start =
+        bus_api->StopConsumer("task_worker");
+    if (!Expect(
+            !stop_consumer_before_start.IsOk() &&
+                stop_consumer_before_start.GetError() ==
+                    foundation::base::ErrorCode::kDisconnected,
+            "StopConsumer before Start should return kDisconnected")) {
         return false;
     }
 

@@ -113,6 +113,16 @@ foundation::base::Result<void> MessageBusServiceProxy::UnregisterConsumerHandler
     return foundation::base::MakeSuccess();
 }
 
+foundation::base::Result<void> MessageBusServiceProxy::StartConsumer(
+    const std::string& consumer_name) {
+    return StartConsumerWithDriver(LookupDriver(state_), consumer_name);
+}
+
+foundation::base::Result<void> MessageBusServiceProxy::StopConsumer(
+    const std::string& consumer_name) {
+    return StopConsumerWithDriver(LookupDriver(state_), consumer_name);
+}
+
 foundation::base::Result<void> MessageBusServiceProxy::RegisterConnectionStateHandler(
     const std::string& handler_name,
     ConnectionStateHandler handler) {

@@ -91,6 +91,28 @@ public:
     virtual foundation::base::Result<void> UnregisterConsumerHandler(
         const std::string& consumer_name) = 0;
     /**
+     * @brief 启动已配置消费者。
+     *
+     * consumer_name 对应 `ConsumerSpec::name`，不是队列名。该接口用于运行期打开
+     * 某个消费者的投递流；若消费者已经处于启动状态，调用应保持幂等并返回成功。
+     *
+     * @param consumer_name 消费者逻辑名称。
+     * @return 成功返回 `Ok`；失败时返回参数、状态、连接或 broker 错误。
+     */
+    virtual foundation::base::Result<void> StartConsumer(
+        const std::string& consumer_name) = 0;
+    /**
+     * @brief 停止已配置消费者。
+     *
+     * 停止消费者只取消该 consumer tag 的新投递，不删除队列、绑定或消息处理回调。
+     * 若消费者已经停止，调用应保持幂等并返回成功。
+     *
+     * @param consumer_name 消费者逻辑名称。
+     * @return 成功返回 `Ok`；失败时返回参数、状态、连接或 broker 错误。
+     */
+    virtual foundation::base::Result<void> StopConsumer(
+        const std::string& consumer_name) = 0;
+    /**
      * @brief 注册连接状态变化回调。
      *
      * handler 用于观察 AMQP 连接驱动的状态转移，例如连接成功、断线重连或停机。

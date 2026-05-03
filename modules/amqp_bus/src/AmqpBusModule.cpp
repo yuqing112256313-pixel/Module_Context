@@ -15,6 +15,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 namespace module_context {
 namespace messaging {
@@ -31,6 +32,58 @@ void LogResultIfError(const foundation::base::Result<void>& result,
                       const std::string& message) {
     if (!result.IsOk()) {
         FOUNDATION_LOG_ERROR(message << ": " << result.GetMessage());
+    }
+}
+
+void InvokeConnectionStateHandler(
+    const std::string& handler_name,
+    ConnectionStateHandler handler,
+    const ConnectionStateChange& change) {
+    try {
+        handler(change);
+    } catch (...) {
+        FOUNDATION_LOG_ERROR(
+            "Connection state handler '" << handler_name
+            << "' threw an exception");
+    }
+}
+
+void DispatchConnectionStateChange(
+    const std::shared_ptr<AmqpBusSharedState>& state,
+    const ConnectionStateChange& change) {
+    std::vector<std::pair<std::string, ConnectionStateHandler> > handlers;
+    std::shared_ptr<foundation::concurrent::ThreadPool> worker_pool;
+    {
+        std::lock_guard<std::mutex> lock(state->mutex);
+        for (std::map<std::string, ConnectionStateHandler>::const_iterator it =
+                 state->state_handlers.begin();
+             it != state->state_handlers.end();
+             ++it) {
+            handlers.push_back(*it);
+        }
+        worker_pool = state->worker_pool;
+    }
+
+    for (std::size_t index = 0; index < handlers.size(); ++index) {
+        const std::string handler_name = handlers[index].first;
+        ConnectionStateHandler handler = handlers[index].second;
+        if (worker_pool && !worker_pool->IsStopped()) {
+            foundation::base::Result<std::future<void> > submitted =
+                worker_pool->Submit(
+                    [handler_name, handler, change]() {
+                        InvokeConnectionStateHandler(
+                            handler_name,
+                            handler,
+                            change);
+                    });
+            if (submitted.IsOk()) {
+                continue;
+            }
+        }
+
+        // 停机阶段 worker pool 可能已经关闭，此时同步兜底以保证 Stopped/Error
+        // 事件不会丢失。状态观察者应保持轻量，不应在回调中长时间阻塞。
+        InvokeConnectionStateHandler(handler_name, handler, change);
     }
 }
 
@@ -77,6 +130,17 @@ foundation::base::Result<void> AmqpBusModule::RegisterConsumerHandler(
 foundation::base::Result<void> AmqpBusModule::UnregisterConsumerHandler(
     const std::string& consumer_name) {
     return service_proxy_->UnregisterConsumerHandler(consumer_name);
+}
+
+foundation::base::Result<void> AmqpBusModule::RegisterConnectionStateHandler(
+    const std::string& handler_name,
+    ConnectionStateHandler handler) {
+    return service_proxy_->RegisterConnectionStateHandler(handler_name, handler);
+}
+
+foundation::base::Result<void> AmqpBusModule::UnregisterConnectionStateHandler(
+    const std::string& handler_name) {
+    return service_proxy_->UnregisterConnectionStateHandler(handler_name);
 }
 
 foundation::base::Result<void> AmqpBusModule::DeclareExchange(
@@ -134,6 +198,7 @@ foundation::base::Result<void> AmqpBusModule::OnInit() {
         std::lock_guard<std::mutex> lock(shared_state_->mutex);
         shared_state_->config = parsed_config;
         shared_state_->handlers.clear();
+        shared_state_->state_handlers.clear();
         shared_state_->worker_pool = worker_pool;
         shared_state_->driver.reset();
         shared_state_->stopping = false;
@@ -257,6 +322,9 @@ foundation::base::Result<void> AmqpBusModule::OnStart() {
                             ConsumeAction::Requeue),
                         "Requeue message because worker task submission failed");
                 }
+            },
+            [state](const ConnectionStateChange& change) {
+                DispatchConnectionStateChange(state, change);
             });
 
     {
@@ -314,6 +382,7 @@ foundation::base::Result<void> AmqpBusModule::OnFini() {
     std::lock_guard<std::mutex> lock(shared_state_->mutex);
     shared_state_->stopping = false;
     shared_state_->handlers.clear();
+    shared_state_->state_handlers.clear();
     shared_state_->driver.reset();
     shared_state_->worker_pool.reset();
     shared_state_->config.reset(new AmqpBusConfig());

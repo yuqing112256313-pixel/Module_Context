@@ -91,6 +91,27 @@ public:
     virtual foundation::base::Result<void> UnregisterConsumerHandler(
         const std::string& consumer_name) = 0;
     /**
+     * @brief 注册连接状态变化回调。
+     *
+     * handler 用于观察 AMQP 连接驱动的状态转移，例如连接成功、断线重连或停机。
+     * 注册后只接收后续状态变化；若需要当前状态，应同时调用 `GetConnectionState()`。
+     *
+     * @param handler_name 观察者名称，需在当前服务内唯一。
+     * @param handler 状态变化回调。
+     * @return 成功返回 `Ok`；失败时返回参数错误或状态错误。
+     */
+    virtual foundation::base::Result<void> RegisterConnectionStateHandler(
+        const std::string& handler_name,
+        ConnectionStateHandler handler) = 0;
+    /**
+     * @brief 注销连接状态变化回调。
+     *
+     * @param handler_name 注册时使用的观察者名称。
+     * @return 成功返回 `Ok`；失败时返回参数错误或未找到。
+     */
+    virtual foundation::base::Result<void> UnregisterConnectionStateHandler(
+        const std::string& handler_name) = 0;
+    /**
      * @brief 声明交换机。
      *
      * 该接口用于运行期补充或更新 AMQP 拓扑；模块启动阶段也会按配置声明一次拓扑。

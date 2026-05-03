@@ -27,6 +27,7 @@ struct AmqpBusSharedState {
         : mutex(),
           config(new AmqpBusConfig()),
           handlers(),
+          state_handlers(),
           worker_pool(),
           driver(),
           stopping(false) {
@@ -37,6 +38,8 @@ struct AmqpBusSharedState {
     std::shared_ptr<AmqpBusConfig> config;
     // 业务注册的消费者处理器，key 为 ConsumerSpec::name。
     std::map<std::string, MessageHandler> handlers;
+    // 连接状态观察者，key 为调用方提供的观察者名称。
+    std::map<std::string, ConnectionStateHandler> state_handlers;
     // 消费回调的业务执行线程池；AMQP 驱动线程只负责网络和协议推进。
     std::shared_ptr<foundation::concurrent::ThreadPool> worker_pool;
     // 当前连接驱动。Stop/Start 会替换或停止该对象。

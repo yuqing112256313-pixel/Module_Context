@@ -10,12 +10,15 @@
 #include <cstdint>
 #include <chrono>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace {
 
 using foundation::config::ConfigValue;
+using module_context::messaging::ConnectionStateChange;
 using module_context::messaging::ConnectionState;
 using module_context::messaging::ConsumeAction;
 using module_context::messaging::IncomingMessage;
@@ -298,6 +301,22 @@ bool RunLifecycleCase() {
         return false;
     }
 
+    std::mutex state_changes_mutex;
+    std::vector<ConnectionStateChange> state_changes;
+    foundation::base::Result<void> state_register_result =
+        bus_api->RegisterConnectionStateHandler(
+            "test_state_observer",
+            [&state_changes_mutex, &state_changes](
+                const ConnectionStateChange& change) {
+                std::lock_guard<std::mutex> lock(state_changes_mutex);
+                state_changes.push_back(change);
+            });
+    if (!Expect(
+            state_register_result.IsOk(),
+            "RegisterConnectionStateHandler should succeed")) {
+        return false;
+    }
+
     if (!Expect(module.ModuleType() == "amqp_bus",
                 "AmqpBusModule should expose the platform ModuleType")) {
         return false;
@@ -382,6 +401,14 @@ bool RunLifecycleCase() {
             "Connection state should leave Created after Start")) {
         return false;
     }
+    {
+        std::lock_guard<std::mutex> lock(state_changes_mutex);
+        if (!Expect(
+                !state_changes.empty(),
+                "Connection state handler should receive start/connect events")) {
+            return false;
+        }
+    }
 
     foundation::base::Result<void> publish_after_start = bus_api->Publish(request);
     if (!Expect(
@@ -417,6 +444,21 @@ bool RunLifecycleCase() {
     if (!Expect(stop_result.IsOk(), "AmqpBusModule Stop should succeed")) {
         return false;
     }
+    {
+        std::lock_guard<std::mutex> lock(state_changes_mutex);
+        bool saw_stopped = false;
+        for (std::size_t index = 0; index < state_changes.size(); ++index) {
+            if (state_changes[index].current_state == ConnectionState::Stopped) {
+                saw_stopped = true;
+                break;
+            }
+        }
+        if (!Expect(
+                saw_stopped,
+                "Connection state handler should receive Stopped event")) {
+            return false;
+        }
+    }
 
     foundation::base::Result<void> restart_result = module.Start();
     if (!Expect(restart_result.IsOk(), "AmqpBusModule should restart after Stop")) {
@@ -427,6 +469,14 @@ bool RunLifecycleCase() {
 
     foundation::base::Result<void> second_stop_result = module.Stop();
     if (!Expect(second_stop_result.IsOk(), "AmqpBusModule second Stop should succeed")) {
+        return false;
+    }
+
+    foundation::base::Result<void> state_unregister_result =
+        bus_api->UnregisterConnectionStateHandler("test_state_observer");
+    if (!Expect(
+            state_unregister_result.IsOk(),
+            "UnregisterConnectionStateHandler should succeed")) {
         return false;
     }
 

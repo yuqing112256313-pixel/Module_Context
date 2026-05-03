@@ -50,6 +50,24 @@ enum class ConnectionState {
 };
 
 /**
+ * @brief AMQP 连接状态变化事件。
+ *
+ * 事件只描述模块内部连接驱动的状态转移；`reason` 用于记录触发变化的连接错误、
+ * 停机原因或启动阶段说明，不应被业务代码当作稳定协议字段解析。
+ */
+struct MC_FRAMEWORK_API ConnectionStateChange {
+    ConnectionState previous_state;
+    ConnectionState current_state;
+    std::string reason;
+
+    ConnectionStateChange()
+        : previous_state(ConnectionState::Created),
+          current_state(ConnectionState::Created),
+          reason() {
+    }
+};
+
+/**
  * @brief 消息总线能力开关。
  *
  * 能力描述当前服务实现是否支持某类 AMQP 行为。它不是业务配置项，也不表示当前
@@ -293,6 +311,11 @@ struct MC_FRAMEWORK_API IncomingMessage {
  * @brief 消息处理回调。
  */
 typedef std::function<ConsumeAction(const IncomingMessage&)> MessageHandler;
+
+/**
+ * @brief 连接状态变化回调。
+ */
+typedef std::function<void(const ConnectionStateChange&)> ConnectionStateHandler;
 
 }  // namespace messaging
 }  // namespace module_context

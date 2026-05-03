@@ -33,13 +33,16 @@ typedef std::function<void(
     const IncomingMessage&,
     const DeliveryContext&)> DeliveryCallback;
 
+typedef std::function<void(const ConnectionStateChange&)> ConnectionStateCallback;
+
 // DriverOps 是模块/proxy 与 cpp 内部连接驱动之间的窄桥接层。连接驱动类型不
 // 暴露到公开头文件，模块外壳也不需要知道 AMQP-CPP 的具体类。
 foundation::base::Result<AmqpBusConfig> ParseAmqpBusConfig(
     const foundation::config::ConfigValue& config_value);
 std::shared_ptr<AmqpConnectionDriver> CreateAmqpConnectionDriver(
     const AmqpBusConfig& config,
-    DeliveryCallback delivery_callback);
+    DeliveryCallback delivery_callback,
+    ConnectionStateCallback state_callback);
 foundation::base::Result<void> StartDriver(
     const std::shared_ptr<AmqpConnectionDriver>& driver);
 foundation::base::Result<void> StopDriver(

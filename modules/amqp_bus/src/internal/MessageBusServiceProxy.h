@@ -34,6 +34,11 @@ public:
         MessageHandler handler) override;
     foundation::base::Result<void> UnregisterConsumerHandler(
         const std::string& consumer_name) override;
+    foundation::base::Result<void> RegisterConnectionStateHandler(
+        const std::string& handler_name,
+        ConnectionStateHandler handler) override;
+    foundation::base::Result<void> UnregisterConnectionStateHandler(
+        const std::string& handler_name) override;
     foundation::base::Result<void> DeclareExchange(
         const ExchangeSpec& spec) override;
     foundation::base::Result<void> DeclareQueue(

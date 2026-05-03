@@ -113,6 +113,48 @@ foundation::base::Result<void> MessageBusServiceProxy::UnregisterConsumerHandler
     return foundation::base::MakeSuccess();
 }
 
+foundation::base::Result<void> MessageBusServiceProxy::RegisterConnectionStateHandler(
+    const std::string& handler_name,
+    ConnectionStateHandler handler) {
+    if (!state_) {
+        return foundation::base::Result<void>(
+            foundation::base::ErrorCode::kInvalidState,
+            "AMQP bus shared state is unavailable");
+    }
+
+    if (handler_name.empty()) {
+        return MakeInvalidArgument("handler_name must not be empty");
+    }
+    if (!handler) {
+        return MakeInvalidArgument("ConnectionStateHandler must be valid");
+    }
+
+    std::lock_guard<std::mutex> lock(state_->mutex);
+    state_->state_handlers[handler_name] = handler;
+    return foundation::base::MakeSuccess();
+}
+
+foundation::base::Result<void> MessageBusServiceProxy::UnregisterConnectionStateHandler(
+    const std::string& handler_name) {
+    if (!state_) {
+        return foundation::base::Result<void>(
+            foundation::base::ErrorCode::kInvalidState,
+            "AMQP bus shared state is unavailable");
+    }
+
+    std::lock_guard<std::mutex> lock(state_->mutex);
+    std::map<std::string, ConnectionStateHandler>::iterator it =
+        state_->state_handlers.find(handler_name);
+    if (it == state_->state_handlers.end()) {
+        return foundation::base::Result<void>(
+            foundation::base::ErrorCode::kNotFound,
+            "Connection state handler '" + handler_name + "' is not registered");
+    }
+
+    state_->state_handlers.erase(it);
+    return foundation::base::MakeSuccess();
+}
+
 foundation::base::Result<void> MessageBusServiceProxy::DeclareExchange(
     const ExchangeSpec& spec) {
     return DeclareExchangeWithDriver(LookupDriver(state_), spec);

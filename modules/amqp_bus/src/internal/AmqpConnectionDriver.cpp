@@ -1465,7 +1465,8 @@ public:
 
 public:
     AmqpConnectionDriver(const AmqpBusConfig& config,
-                             DeliveryCallback delivery_callback);
+                         DeliveryCallback delivery_callback,
+                         ConnectionStateCallback state_callback);
     ~AmqpConnectionDriver();
 
     foundation::base::Result<void> Start();
@@ -1507,6 +1508,10 @@ private:
     void MaybeSendHeartbeat();
     void DrainCommands();
     bool IsReadyLocked() const;
+    ConnectionStateChange SetStateLocked(
+        ConnectionState next_state,
+        const std::string& reason);
+    void EmitStateChange(const ConnectionStateChange& change) const;
     void RequestDisconnect(const std::string& reason);
     void HandleDisconnect(const std::string& reason);
     void StartBootstrap();
@@ -1541,6 +1546,7 @@ private:
 private:
     AmqpBusConfig config_;
     DeliveryCallback delivery_callback_;
+    ConnectionStateCallback state_callback_;
     mutable std::mutex mutex_;
     std::thread thread_;
     bool stop_requested_;
@@ -1569,9 +1575,11 @@ private:
 
 AmqpConnectionDriver::AmqpConnectionDriver(
     const AmqpBusConfig& config,
-    DeliveryCallback delivery_callback)
+    DeliveryCallback delivery_callback,
+    ConnectionStateCallback state_callback)
     : config_(config),
       delivery_callback_(delivery_callback),
+      state_callback_(state_callback),
       mutex_(),
       thread_(),
       stop_requested_(false),
@@ -1603,17 +1611,24 @@ AmqpConnectionDriver::~AmqpConnectionDriver() {
 }
 
 foundation::base::Result<void> AmqpConnectionDriver::Start() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (thread_.joinable()) {
-        return MakeInvalidState("AMQP connection driver already started");
+    ConnectionStateChange change;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (thread_.joinable()) {
+            return MakeInvalidState("AMQP connection driver already started");
+        }
+
+        stop_requested_ = false;
+        last_error_.clear();
+        change = SetStateLocked(
+            ConnectionState::Connecting,
+            "AMQP driver started");
+        next_reconnect_at_ = std::chrono::steady_clock::now();
+        reconnect_delay_ms_ = config_.connection.reconnect.initial_delay_ms;
+        thread_ = std::thread(&AmqpConnectionDriver::ThreadMain, this);
     }
 
-    stop_requested_ = false;
-    state_ = ConnectionState::Connecting;
-    last_error_.clear();
-    next_reconnect_at_ = std::chrono::steady_clock::now();
-    reconnect_delay_ms_ = config_.connection.reconnect.initial_delay_ms;
-    thread_ = std::thread(&AmqpConnectionDriver::ThreadMain, this);
+    EmitStateChange(change);
     return foundation::base::MakeSuccess();
 }
 
@@ -1627,8 +1642,14 @@ foundation::base::Result<void> AmqpConnectionDriver::Stop() {
         thread_.join();
     }
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    state_ = ConnectionState::Stopped;
+    ConnectionStateChange change;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        change = SetStateLocked(
+            ConnectionState::Stopped,
+            "AMQP driver stopped");
+    }
+    EmitStateChange(change);
     return foundation::base::MakeSuccess();
 }
 
@@ -2250,9 +2271,13 @@ foundation::base::Result<void> AmqpConnectionDriver::EnqueueCommand(
 void AmqpConnectionDriver::ThreadMain() {
     SocketSystemScope socket_scope;
     if (!socket_scope.IsOk()) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        state_ = ConnectionState::Error;
-        last_error_ = "Failed to initialize socket subsystem";
+        ConnectionStateChange change;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            last_error_ = "Failed to initialize socket subsystem";
+            change = SetStateLocked(ConnectionState::Error, last_error_);
+        }
+        EmitStateChange(change);
         return;
     }
 
@@ -2320,17 +2345,23 @@ bool AmqpConnectionDriver::ShouldAttemptReconnect() {
 
 void AmqpConnectionDriver::ApplyReconnectBackoff(const std::string& error) {
     FOUNDATION_LOG_WARNING("AMQP connect attempt failed: " << error);
-    std::lock_guard<std::mutex> lock(mutex_);
-    last_error_ = error;
-    state_ = config_.connection.reconnect.enabled
-        ? ConnectionState::Reconnecting
-        : ConnectionState::Error;
-    next_reconnect_at_ =
-        std::chrono::steady_clock::now() +
-        std::chrono::milliseconds(reconnect_delay_ms_);
-    reconnect_delay_ms_ = std::min(
-        reconnect_delay_ms_ * 2,
-        config_.connection.reconnect.max_delay_ms);
+    ConnectionStateChange change;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        last_error_ = error;
+        change = SetStateLocked(
+            config_.connection.reconnect.enabled
+                ? ConnectionState::Reconnecting
+                : ConnectionState::Error,
+            error);
+        next_reconnect_at_ =
+            std::chrono::steady_clock::now() +
+            std::chrono::milliseconds(reconnect_delay_ms_);
+        reconnect_delay_ms_ = std::min(
+            reconnect_delay_ms_ * 2,
+            config_.connection.reconnect.max_delay_ms);
+    }
+    EmitStateChange(change);
 }
 
 foundation::base::Result<void> AmqpConnectionDriver::ConnectSocket() {
@@ -2508,11 +2539,15 @@ foundation::base::Result<void> AmqpConnectionDriver::ConnectSocket() {
                 HandleReturnedMessage(message, code, description);
             });
 
+        ConnectionStateChange change;
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            state_ = ConnectionState::Connecting;
             last_error_.clear();
+            change = SetStateLocked(
+                ConnectionState::Connecting,
+                "AMQP socket connected");
         }
+        EmitStateChange(change);
 
         result = foundation::base::MakeSuccess();
         break;
@@ -2649,6 +2684,26 @@ bool AmqpConnectionDriver::IsReadyLocked() const {
            (!config_.publisher_confirms_enabled || publisher_confirms_ready_);
 }
 
+ConnectionStateChange AmqpConnectionDriver::SetStateLocked(
+    ConnectionState next_state,
+    const std::string& reason) {
+    ConnectionStateChange change;
+    change.previous_state = state_;
+    change.current_state = next_state;
+    change.reason = reason;
+    state_ = next_state;
+    return change;
+}
+
+void AmqpConnectionDriver::EmitStateChange(
+    const ConnectionStateChange& change) const {
+    if (change.previous_state == change.current_state || !state_callback_) {
+        return;
+    }
+
+    state_callback_(change);
+}
+
 void AmqpConnectionDriver::RequestDisconnect(const std::string& reason) {
     FOUNDATION_LOG_WARNING("AMQP disconnect requested: " << reason);
     pending_disconnect_ = true;
@@ -2676,21 +2731,27 @@ void AmqpConnectionDriver::HandleDisconnect(const std::string& reason) {
     outbound_.clear();
     inbound_.clear();
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (!stop_requested_) {
-        last_error_ = reason;
-        state_ = config_.connection.reconnect.enabled
-            ? ConnectionState::Reconnecting
-            : ConnectionState::Error;
-        next_reconnect_at_ =
-            std::chrono::steady_clock::now() +
-            std::chrono::milliseconds(reconnect_delay_ms_);
-        reconnect_delay_ms_ = std::min(
-            reconnect_delay_ms_ * 2,
-            config_.connection.reconnect.max_delay_ms);
-    } else {
-        state_ = ConnectionState::Stopped;
+    ConnectionStateChange change;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!stop_requested_) {
+            last_error_ = reason;
+            change = SetStateLocked(
+                config_.connection.reconnect.enabled
+                    ? ConnectionState::Reconnecting
+                    : ConnectionState::Error,
+                reason);
+            next_reconnect_at_ =
+                std::chrono::steady_clock::now() +
+                std::chrono::milliseconds(reconnect_delay_ms_);
+            reconnect_delay_ms_ = std::min(
+                reconnect_delay_ms_ * 2,
+                config_.connection.reconnect.max_delay_ms);
+        } else {
+            change = SetStateLocked(ConnectionState::Stopped, reason);
+        }
     }
+    EmitStateChange(change);
 }
 
 void AmqpConnectionDriver::StartBootstrap() {
@@ -2850,9 +2911,15 @@ void AmqpConnectionDriver::BootstrapBindings(std::size_t index) {
 
 void AmqpConnectionDriver::BootstrapConsumers(std::size_t index) {
     if (index >= config_.consumers.size()) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        state_ = ConnectionState::Connected;
-        ready_ = true;
+        ConnectionStateChange change;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            ready_ = true;
+            change = SetStateLocked(
+                ConnectionState::Connected,
+                "AMQP topology rebuild completed");
+        }
+        EmitStateChange(change);
         FOUNDATION_LOG_INFO("AMQP topology rebuild completed");
         return;
     }
@@ -3243,9 +3310,10 @@ foundation::base::Result<AmqpBusConfig> ParseAmqpBusConfig(
 
 std::shared_ptr<AmqpConnectionDriver> CreateAmqpConnectionDriver(
     const AmqpBusConfig& config,
-    DeliveryCallback delivery_callback) {
+    DeliveryCallback delivery_callback,
+    ConnectionStateCallback state_callback) {
     return std::shared_ptr<AmqpConnectionDriver>(
-        new AmqpConnectionDriver(config, delivery_callback));
+        new AmqpConnectionDriver(config, delivery_callback, state_callback));
 }
 
 foundation::base::Result<void> StartDriver(

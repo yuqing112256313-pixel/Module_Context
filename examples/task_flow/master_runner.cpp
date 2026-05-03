@@ -659,9 +659,9 @@ PublishRequest BuildPublishRequest(
     PublishRequest request;
     request.exchange = exchange;
     request.routing_key = routing_key;
-    request.content_type = "text/plain";
-    request.correlation_id = task_message.task_id;
-    request.persistent = false;
+    request.properties.content_type = "text/plain";
+    request.properties.correlation_id = task_message.task_id;
+    request.properties.persistent = false;
     request.mandatory = false;
     request.payload.assign(payload_text.begin(), payload_text.end());
     return request;

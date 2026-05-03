@@ -55,17 +55,13 @@ struct PublisherSpec {
     std::string name;
     std::string exchange;
     std::string routing_key;
-    std::string content_type;
-    foundation::config::ConfigValue::Object headers;
-    bool persistent;
+    MessageProperties properties;
 
     PublisherSpec()
         : name(),
           exchange(),
           routing_key(),
-          content_type(),
-          headers(),
-          persistent(false) {
+          properties() {
     }
 };
 

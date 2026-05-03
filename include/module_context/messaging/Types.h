@@ -164,6 +164,49 @@ struct MC_FRAMEWORK_API ConsumerSpec {
 };
 
 /**
+ * @brief AMQP 消息基础属性。
+ *
+ * 该结构对应 AMQP 0-9-1 basic properties 中常用且跨 broker 通用的字段。
+ * 字符串为空表示未设置该属性；`priority` 与 `timestamp` 需要通过对应
+ * `has_*` 字段区分“未设置”和数值 0。
+ */
+struct MC_FRAMEWORK_API MessageProperties {
+    std::string content_type;
+    std::string content_encoding;
+    std::string correlation_id;
+    std::string reply_to;
+    std::string expiration;
+    std::string message_id;
+    std::string type;
+    std::string user_id;
+    std::string app_id;
+    foundation::config::ConfigValue::Object headers;
+    bool persistent;
+    bool has_priority;
+    std::uint8_t priority;
+    bool has_timestamp;
+    std::uint64_t timestamp;
+
+    MessageProperties()
+        : content_type(),
+          content_encoding(),
+          correlation_id(),
+          reply_to(),
+          expiration(),
+          message_id(),
+          type(),
+          user_id(),
+          app_id(),
+          headers(),
+          persistent(false),
+          has_priority(false),
+          priority(0),
+          has_timestamp(false),
+          timestamp(0) {
+    }
+};
+
+/**
  * @brief 发布请求。
  *
  * `exchange` 为空时表示 AMQP 默认交换机，此时 `routing_key` 应为目标队列名。
@@ -173,22 +216,14 @@ struct MC_FRAMEWORK_API PublishRequest {
     std::string exchange;
     std::string routing_key;
     std::vector<char> payload;
-    std::string content_type;
-    std::string correlation_id;
-    std::string reply_to;
-    foundation::config::ConfigValue::Object headers;
-    bool persistent;
+    MessageProperties properties;
     bool mandatory;
 
     PublishRequest()
         : exchange(),
           routing_key(),
           payload(),
-          content_type(),
-          correlation_id(),
-          reply_to(),
-          headers(),
-          persistent(false),
+          properties(),
           mandatory(false) {
     }
 };
@@ -241,10 +276,7 @@ struct MC_FRAMEWORK_API IncomingMessage {
     std::string exchange;
     std::string routing_key;
     std::vector<char> payload;
-    std::string content_type;
-    std::string correlation_id;
-    std::string reply_to;
-    foundation::config::ConfigValue::Object headers;
+    MessageProperties properties;
     bool redelivered;
 
     IncomingMessage()
@@ -252,10 +284,7 @@ struct MC_FRAMEWORK_API IncomingMessage {
           exchange(),
           routing_key(),
           payload(),
-          content_type(),
-          correlation_id(),
-          reply_to(),
-          headers(),
+          properties(),
           redelivered(false) {
     }
 };

@@ -855,12 +855,47 @@ foundation::base::Result<PublisherSpec> ParsePublisherSpec(
         GetOptionalBoolField(value, "persistent", true);
     foundation::base::Result<foundation::config::ConfigValue::Object> headers =
         GetOptionalArgumentsField(value, "headers");
+    foundation::base::Result<std::string> content_encoding =
+        GetOptionalStringField(value, "content_encoding", "");
+    foundation::base::Result<std::string> correlation_id =
+        GetOptionalStringField(value, "correlation_id", "");
+    foundation::base::Result<std::string> reply_to =
+        GetOptionalStringField(value, "reply_to", "");
+    foundation::base::Result<std::string> expiration =
+        GetOptionalStringField(value, "expiration", "");
+    foundation::base::Result<std::string> message_id =
+        GetOptionalStringField(value, "message_id", "");
+    foundation::base::Result<std::string> type =
+        GetOptionalStringField(value, "type", "");
+    foundation::base::Result<std::string> user_id =
+        GetOptionalStringField(value, "user_id", "");
+    foundation::base::Result<std::string> app_id =
+        GetOptionalStringField(value, "app_id", "");
+    foundation::base::Result<std::int64_t> priority =
+        GetOptionalInt64Field(value, "priority", 0);
+    foundation::base::Result<std::int64_t> timestamp =
+        GetOptionalInt64Field(value, "timestamp", 0);
 
     if (!name.IsOk() || !exchange.IsOk() || !routing_key.IsOk() ||
-        !content_type.IsOk() || !persistent.IsOk() || !headers.IsOk()) {
+        !content_type.IsOk() || !persistent.IsOk() || !headers.IsOk() ||
+        !content_encoding.IsOk() || !correlation_id.IsOk() ||
+        !reply_to.IsOk() || !expiration.IsOk() || !message_id.IsOk() ||
+        !type.IsOk() || !user_id.IsOk() || !app_id.IsOk() ||
+        !priority.IsOk() || !timestamp.IsOk()) {
         return foundation::base::Result<PublisherSpec>(
             foundation::base::ErrorCode::kParseError,
             "Invalid publisher specification");
+    }
+
+    if (priority.Value() < 0 || priority.Value() > 255) {
+        return foundation::base::Result<PublisherSpec>(
+            foundation::base::ErrorCode::kParseError,
+            "Publisher priority must be in range 0..255");
+    }
+    if (timestamp.Value() < 0) {
+        return foundation::base::Result<PublisherSpec>(
+            foundation::base::ErrorCode::kParseError,
+            "Publisher timestamp must be non-negative");
     }
 
     foundation::base::Result<void> target_result =
@@ -875,9 +910,25 @@ foundation::base::Result<PublisherSpec> ParsePublisherSpec(
     spec.name = name.Value();
     spec.exchange = exchange.Value();
     spec.routing_key = routing_key.Value();
-    spec.content_type = content_type.Value();
-    spec.headers = headers.Value();
-    spec.persistent = persistent.Value();
+    spec.properties.content_type = content_type.Value();
+    spec.properties.content_encoding = content_encoding.Value();
+    spec.properties.correlation_id = correlation_id.Value();
+    spec.properties.reply_to = reply_to.Value();
+    spec.properties.expiration = expiration.Value();
+    spec.properties.message_id = message_id.Value();
+    spec.properties.type = type.Value();
+    spec.properties.user_id = user_id.Value();
+    spec.properties.app_id = app_id.Value();
+    spec.properties.headers = headers.Value();
+    spec.properties.persistent = persistent.Value();
+    if (value.Contains("priority")) {
+        spec.properties.has_priority = true;
+        spec.properties.priority = static_cast<std::uint8_t>(priority.Value());
+    }
+    if (value.Contains("timestamp")) {
+        spec.properties.has_timestamp = true;
+        spec.properties.timestamp = static_cast<std::uint64_t>(timestamp.Value());
+    }
     return foundation::base::Result<PublisherSpec>(spec);
 }
 
@@ -1589,26 +1640,51 @@ foundation::base::Result<void> AmqpConnectionDriver::FillEnvelope(
     }
 
     foundation::base::Result<AMQP::Table> headers =
-        ConfigObjectToAmqpTable(request.headers);
+        ConfigObjectToAmqpTable(request.properties.headers);
     if (!headers.IsOk()) {
         return foundation::base::Result<void>(
             headers.GetError(),
             headers.GetMessage());
     }
 
-    if (!request.content_type.empty()) {
-        envelope->setContentType(request.content_type);
+    const MessageProperties& properties = request.properties;
+    if (!properties.content_type.empty()) {
+        envelope->setContentType(properties.content_type);
     }
-    if (!request.correlation_id.empty()) {
-        envelope->setCorrelationID(request.correlation_id);
+    if (!properties.content_encoding.empty()) {
+        envelope->setContentEncoding(properties.content_encoding);
     }
-    if (!request.reply_to.empty()) {
-        envelope->setReplyTo(request.reply_to);
+    if (!properties.correlation_id.empty()) {
+        envelope->setCorrelationID(properties.correlation_id);
     }
-    if (!request.headers.empty()) {
+    if (!properties.reply_to.empty()) {
+        envelope->setReplyTo(properties.reply_to);
+    }
+    if (!properties.expiration.empty()) {
+        envelope->setExpiration(properties.expiration);
+    }
+    if (!properties.message_id.empty()) {
+        envelope->setMessageID(properties.message_id);
+    }
+    if (!properties.type.empty()) {
+        envelope->setTypeName(properties.type);
+    }
+    if (!properties.user_id.empty()) {
+        envelope->setUserID(properties.user_id);
+    }
+    if (!properties.app_id.empty()) {
+        envelope->setAppID(properties.app_id);
+    }
+    if (!properties.headers.empty()) {
         envelope->setHeaders(headers.Value());
     }
-    envelope->setPersistent(request.persistent);
+    if (properties.has_priority) {
+        envelope->setPriority(properties.priority);
+    }
+    if (properties.has_timestamp) {
+        envelope->setTimestamp(properties.timestamp);
+    }
+    envelope->setPersistent(properties.persistent);
     return foundation::base::MakeSuccess();
 }
 
@@ -2963,16 +3039,29 @@ bool AmqpConnectionDriver::MarkReturnedPublish(
                 pending.request.payload.size()) != 0) {
             continue;
         }
-        if (!pending.request.content_type.empty() &&
-            pending.request.content_type != message.contentType()) {
+        const MessageProperties& properties = pending.request.properties;
+        if (!properties.content_type.empty() &&
+            properties.content_type != message.contentType()) {
             continue;
         }
-        if (!pending.request.correlation_id.empty() &&
-            pending.request.correlation_id != message.correlationID()) {
+        if (!properties.content_encoding.empty() &&
+            properties.content_encoding != message.contentEncoding()) {
             continue;
         }
-        if (!pending.request.reply_to.empty() &&
-            pending.request.reply_to != message.replyTo()) {
+        if (!properties.correlation_id.empty() &&
+            properties.correlation_id != message.correlationID()) {
+            continue;
+        }
+        if (!properties.reply_to.empty() &&
+            properties.reply_to != message.replyTo()) {
+            continue;
+        }
+        if (!properties.message_id.empty() &&
+            properties.message_id != message.messageID()) {
+            continue;
+        }
+        if (!properties.type.empty() &&
+            properties.type != message.typeName()) {
             continue;
         }
 
@@ -2993,9 +3082,13 @@ void AmqpConnectionDriver::HandleReturnedMessage(
         return;
     }
 
+    const std::string message_id = message.messageID();
     const std::string correlation_id = message.correlationID();
     FOUNDATION_LOG_WARNING(
         "AMQP broker returned mandatory publish"
+        << (message_id.empty()
+                ? std::string("")
+                : std::string(" message_id='") + message_id + "'")
         << (correlation_id.empty()
                 ? std::string("")
                 : std::string(" correlation_id='") + correlation_id + "'")
@@ -3032,10 +3125,21 @@ void AmqpConnectionDriver::HandleIncomingMessage(
     incoming.payload.assign(
         message.body(),
         message.body() + static_cast<std::ptrdiff_t>(message.bodySize()));
-    incoming.content_type = message.contentType();
-    incoming.correlation_id = message.correlationID();
-    incoming.reply_to = message.replyTo();
-    incoming.headers = headers.Value();
+    incoming.properties.content_type = message.contentType();
+    incoming.properties.content_encoding = message.contentEncoding();
+    incoming.properties.correlation_id = message.correlationID();
+    incoming.properties.reply_to = message.replyTo();
+    incoming.properties.expiration = message.expiration();
+    incoming.properties.message_id = message.messageID();
+    incoming.properties.type = message.typeName();
+    incoming.properties.user_id = message.userID();
+    incoming.properties.app_id = message.appID();
+    incoming.properties.headers = headers.Value();
+    incoming.properties.persistent = message.persistent();
+    incoming.properties.has_priority = message.hasPriority();
+    incoming.properties.priority = message.priority();
+    incoming.properties.has_timestamp = message.hasTimestamp();
+    incoming.properties.timestamp = message.timestamp();
     incoming.redelivered = redelivered;
 
     DeliveryContext delivery;

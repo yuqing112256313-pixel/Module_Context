@@ -75,6 +75,13 @@ ConfigValue MakePublisher(const std::string& name,
     SetField(&publisher, "name", ConfigValue(name));
     SetField(&publisher, "exchange", ConfigValue(exchange));
     SetField(&publisher, "routing_key", ConfigValue(routing_key));
+    SetField(&publisher, "content_type", ConfigValue("text/plain"));
+    SetField(&publisher, "content_encoding", ConfigValue("utf-8"));
+    SetField(&publisher, "message_id", ConfigValue("publisher-template"));
+    SetField(&publisher, "type", ConfigValue("module-context-test"));
+    SetField(&publisher, "app_id", ConfigValue("amqp_bus_module_test"));
+    SetField(&publisher, "priority", ConfigValue(static_cast<std::int64_t>(3)));
+    SetField(&publisher, "timestamp", ConfigValue(static_cast<std::int64_t>(1)));
     SetField(&publisher, "persistent", ConfigValue(true));
     return publisher;
 }
@@ -307,6 +314,15 @@ bool RunLifecycleCase() {
     request.exchange = "task.exchange";
     request.routing_key = "task.run";
     request.payload.push_back('x');
+    request.properties.content_type = "text/plain";
+    request.properties.content_encoding = "utf-8";
+    request.properties.message_id = "publish-property-smoke";
+    request.properties.type = "module-context-test";
+    request.properties.app_id = "amqp_bus_module_test";
+    request.properties.has_priority = true;
+    request.properties.priority = 3;
+    request.properties.has_timestamp = true;
+    request.properties.timestamp = 1;
 
     foundation::base::Result<void> publish_before_start = bus_api->Publish(request);
     if (!Expect(

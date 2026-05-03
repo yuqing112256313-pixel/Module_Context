@@ -195,9 +195,9 @@ Result<void> PublishResultMessage(
     PublishRequest publish_request;
     publish_request.exchange = kResultExchange;
     publish_request.routing_key = kResultRoutingKey;
-    publish_request.content_type = "text/plain";
-    publish_request.correlation_id = result_message.image_id;
-    publish_request.persistent = false;
+    publish_request.properties.content_type = "text/plain";
+    publish_request.properties.correlation_id = result_message.image_id;
+    publish_request.properties.persistent = false;
     publish_request.mandatory = false;
     publish_request.payload.assign(payload.begin(), payload.end());
     return bus->PublishAsync(publish_request);

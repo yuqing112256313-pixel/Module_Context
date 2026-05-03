@@ -171,6 +171,16 @@ public:
      */
     virtual ConnectionState GetConnectionState() const = 0;
     /**
+     * @brief 获取最近一次消息总线错误诊断。
+     *
+     * 该值是诊断快照，不替代每次调用返回的 `Result`。并发调用时，调用方应优先
+     * 依据本次操作的 `Result` 或 `PublishReceipt` 判断结果，再把该快照用于日志
+     * 与排障。
+     *
+     * @return 最近一次连接、协议或可靠发布错误信息。
+     */
+    virtual MessageBusErrorInfo GetLastErrorInfo() const = 0;
+    /**
      * @brief 查询当前服务实现是否支持指定 AMQP 能力。
      *
      * @param feature 待查询能力。

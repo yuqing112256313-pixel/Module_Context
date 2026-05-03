@@ -188,6 +188,10 @@ ConnectionState MessageBusServiceProxy::GetConnectionState() const {
     return GetConnectionStateFromDriver(LookupDriver(state_));
 }
 
+MessageBusErrorInfo MessageBusServiceProxy::GetLastErrorInfo() const {
+    return GetLastErrorInfoFromDriver(LookupDriver(state_));
+}
+
 bool MessageBusServiceProxy::SupportsFeature(MessageBusFeature feature) const {
     switch (feature) {
         case MessageBusFeature::MandatoryReturn:

@@ -103,6 +103,47 @@ enum class PublishDisposition {
 };
 
 /**
+ * @brief 消息总线平台错误分类。
+ *
+ * 该分类补充 `foundation::base::Result` 的通用错误码，用于让调用方区分 AMQP
+ * 连接、发布确认、mandatory return 等协议层语义。
+ */
+enum class MessageBusError {
+    None = 0,
+    InvalidArgument = 1,
+    InvalidState = 2,
+    NotConnected = 3,
+    ConnectionFailed = 4,
+    ConnectionClosed = 5,
+    PublishTimedOut = 6,
+    BrokerRejected = 7,
+    MessageReturned = 8,
+    UnsupportedFeature = 9,
+    OperationFailed = 10,
+    ProtocolError = 11,
+    TransportError = 12
+};
+
+/**
+ * @brief 消息总线错误诊断信息。
+ */
+struct MC_FRAMEWORK_API MessageBusErrorInfo {
+    MessageBusError error;
+    ConnectionState connection_state;
+    int reply_code;
+    std::string reply_text;
+    std::string message;
+
+    MessageBusErrorInfo()
+        : error(MessageBusError::None),
+          connection_state(ConnectionState::Created),
+          reply_code(0),
+          reply_text(),
+          message() {
+    }
+};
+
+/**
  * @brief 交换机声明参数。
  */
 struct MC_FRAMEWORK_API ExchangeSpec {
@@ -280,11 +321,13 @@ struct MC_FRAMEWORK_API PublishReceipt {
     PublishDisposition disposition;
     int reply_code;
     std::string reply_text;
+    MessageBusErrorInfo error;
 
     PublishReceipt()
         : disposition(PublishDisposition::BrokerAccepted),
           reply_code(0),
-          reply_text() {
+          reply_text(),
+          error() {
     }
 };
 

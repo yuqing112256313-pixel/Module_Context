@@ -126,6 +126,21 @@ std::string MakeErrorMessage(const std::string& prefix,
     return prefix + ": " + detail;
 }
 
+MessageBusErrorInfo MakeMessageBusErrorInfo(
+    MessageBusError error,
+    ConnectionState connection_state,
+    const std::string& message,
+    int reply_code,
+    const std::string& reply_text) {
+    MessageBusErrorInfo info;
+    info.error = error;
+    info.connection_state = connection_state;
+    info.message = message;
+    info.reply_code = reply_code;
+    info.reply_text = reply_text;
+    return info;
+}
+
 foundation::base::Result<void> MakeInvalidArgument(const std::string& message) {
     return foundation::base::Result<void>(
         foundation::base::ErrorCode::kInvalidArgument,
@@ -1494,6 +1509,7 @@ public:
         ConsumeAction action);
     ConnectionState GetConnectionState() const;
     std::string LastError() const;
+    MessageBusErrorInfo LastErrorInfo() const;
 
     void onData(AMQP::Connection* connection, const char* data, size_t size) override;
     void onReady(AMQP::Connection* connection) override;
@@ -1518,6 +1534,9 @@ private:
     ConnectionStateChange SetStateLocked(
         ConnectionState next_state,
         const std::string& reason);
+    void SetLastErrorInfoLocked(
+        MessageBusError error,
+        const std::string& message);
     void EmitStateChange(const ConnectionStateChange& change) const;
     void RequestDisconnect(const std::string& reason);
     void HandleDisconnect(const std::string& reason);
@@ -1563,6 +1582,7 @@ private:
     bool stop_requested_;
     ConnectionState state_;
     std::string last_error_;
+    MessageBusErrorInfo last_error_info_;
     std::deque<std::function<void()> > commands_;
     std::unique_ptr<AMQP::Connection> connection_;
     std::unique_ptr<AMQP::Channel> admin_channel_;
@@ -1596,6 +1616,7 @@ AmqpConnectionDriver::AmqpConnectionDriver(
       stop_requested_(false),
       state_(ConnectionState::Created),
       last_error_(),
+      last_error_info_(),
       commands_(),
       connection_(),
       admin_channel_(),
@@ -1631,6 +1652,7 @@ foundation::base::Result<void> AmqpConnectionDriver::Start() {
 
         stop_requested_ = false;
         last_error_.clear();
+        last_error_info_ = MessageBusErrorInfo();
         change = SetStateLocked(
             ConnectionState::Connecting,
             "AMQP driver started");
@@ -1948,7 +1970,16 @@ foundation::base::Result<PublishReceipt> AmqpConnectionDriver::PublishConfirmed(
             enqueue.GetMessage());
     }
 
-    return WaitPendingPublishResult(pending, options.timeout_ms);
+    foundation::base::Result<PublishReceipt> result =
+        WaitPendingPublishResult(pending, options.timeout_ms);
+    if (!result.IsOk() &&
+        result.GetError() == foundation::base::ErrorCode::kTimeout) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        SetLastErrorInfoLocked(
+            MessageBusError::PublishTimedOut,
+            result.GetMessage());
+    }
+    return result;
 }
 
 foundation::base::Result<void> AmqpConnectionDriver::StartConsumer(
@@ -2376,6 +2407,11 @@ std::string AmqpConnectionDriver::LastError() const {
     return last_error_;
 }
 
+MessageBusErrorInfo AmqpConnectionDriver::LastErrorInfo() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return last_error_info_;
+}
+
 void AmqpConnectionDriver::onData(AMQP::Connection*,
                                       const char* data,
                                       size_t size) {
@@ -2427,6 +2463,9 @@ void AmqpConnectionDriver::ThreadMain() {
             std::lock_guard<std::mutex> lock(mutex_);
             last_error_ = "Failed to initialize socket subsystem";
             change = SetStateLocked(ConnectionState::Error, last_error_);
+            SetLastErrorInfoLocked(
+                MessageBusError::TransportError,
+                last_error_);
         }
         EmitStateChange(change);
         return;
@@ -2505,6 +2544,7 @@ void AmqpConnectionDriver::ApplyReconnectBackoff(const std::string& error) {
                 ? ConnectionState::Reconnecting
                 : ConnectionState::Error,
             error);
+        SetLastErrorInfoLocked(MessageBusError::ConnectionFailed, error);
         next_reconnect_at_ =
             std::chrono::steady_clock::now() +
             std::chrono::milliseconds(reconnect_delay_ms_);
@@ -2694,6 +2734,7 @@ foundation::base::Result<void> AmqpConnectionDriver::ConnectSocket() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
             last_error_.clear();
+            last_error_info_ = MessageBusErrorInfo();
             change = SetStateLocked(
                 ConnectionState::Connecting,
                 "AMQP socket connected");
@@ -2846,6 +2887,17 @@ ConnectionStateChange AmqpConnectionDriver::SetStateLocked(
     return change;
 }
 
+void AmqpConnectionDriver::SetLastErrorInfoLocked(
+    MessageBusError error,
+    const std::string& message) {
+    last_error_info_ = MakeMessageBusErrorInfo(
+        error,
+        state_,
+        message,
+        0,
+        "");
+}
+
 void AmqpConnectionDriver::EmitStateChange(
     const ConnectionStateChange& change) const {
     if (change.previous_state == change.current_state || !state_callback_) {
@@ -2892,6 +2944,7 @@ void AmqpConnectionDriver::HandleDisconnect(const std::string& reason) {
                     ? ConnectionState::Reconnecting
                     : ConnectionState::Error,
                 reason);
+            SetLastErrorInfoLocked(MessageBusError::ConnectionClosed, reason);
             next_reconnect_at_ =
                 std::chrono::steady_clock::now() +
                 std::chrono::milliseconds(reconnect_delay_ms_);
@@ -3222,6 +3275,22 @@ void AmqpConnectionDriver::CompletePublishConfirm(
             receipt.disposition = PublishDisposition::Returned;
             receipt.reply_code = it->second.reply_code;
             receipt.reply_text = it->second.reply_text;
+            receipt.error = MakeMessageBusErrorInfo(
+                MessageBusError::MessageReturned,
+                ConnectionState::Connected,
+                it->second.reply_text,
+                it->second.reply_code,
+                it->second.reply_text);
+        } else if (disposition == PublishDisposition::BrokerRejected) {
+            receipt.disposition = disposition;
+            receipt.reply_code = reply_code;
+            receipt.reply_text = reply_text;
+            receipt.error = MakeMessageBusErrorInfo(
+                MessageBusError::BrokerRejected,
+                ConnectionState::Connected,
+                reply_text,
+                reply_code,
+                reply_text);
         } else {
             receipt.disposition = disposition;
             receipt.reply_code = reply_code;
@@ -3487,6 +3556,20 @@ ConnectionState GetConnectionStateFromDriver(
     }
 
     return driver->GetConnectionState();
+}
+
+MessageBusErrorInfo GetLastErrorInfoFromDriver(
+    const std::shared_ptr<AmqpConnectionDriver>& driver) {
+    if (!driver) {
+        return MakeMessageBusErrorInfo(
+            MessageBusError::NotConnected,
+            ConnectionState::Created,
+            "AMQP bus module is not started",
+            0,
+            "");
+    }
+
+    return driver->LastErrorInfo();
 }
 
 bool SupportsFeatureFromDriver(

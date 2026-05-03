@@ -78,6 +78,8 @@ foundation::base::Result<void> CompleteDeliveryAsyncWithDriver(
     ConsumeAction action);
 ConnectionState GetConnectionStateFromDriver(
     const std::shared_ptr<AmqpConnectionDriver>& driver);
+MessageBusErrorInfo GetLastErrorInfoFromDriver(
+    const std::shared_ptr<AmqpConnectionDriver>& driver);
 bool SupportsFeatureFromDriver(
     const std::shared_ptr<AmqpConnectionDriver>& driver,
     MessageBusFeature feature);

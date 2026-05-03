@@ -24,8 +24,11 @@ using module_context::messaging::ConsumeAction;
 using module_context::messaging::IncomingMessage;
 using module_context::messaging::IMessageBusService;
 using module_context::messaging::MessageBusFeature;
+using module_context::messaging::MessageBusError;
+using module_context::messaging::MessageBusErrorInfo;
 using module_context::messaging::PublishRequest;
 using module_context::messaging::PublishConfirmOptions;
+using module_context::messaging::PublishReceipt;
 using module_context::messaging::AmqpBusModule;
 
 bool Expect(bool condition, const std::string& message) {
@@ -274,6 +277,19 @@ bool RunLifecycleCase() {
     if (!Expect(
             bus_api->GetConnectionState() == ConnectionState::Created,
             "Connection state should be Created after Init")) {
+        return false;
+    }
+    MessageBusErrorInfo not_started_error = bus_api->GetLastErrorInfo();
+    if (!Expect(
+            not_started_error.error == MessageBusError::NotConnected,
+            "GetLastErrorInfo before Start should report NotConnected")) {
+        return false;
+    }
+
+    PublishReceipt default_receipt;
+    if (!Expect(
+            default_receipt.error.error == MessageBusError::None,
+            "Default PublishReceipt should not carry a message bus error")) {
         return false;
     }
 

@@ -50,6 +50,7 @@ public:
     foundation::base::Result<void> BindQueue(
         const BindingSpec& spec) override;
     ConnectionState GetConnectionState() const override;
+    MessageBusErrorInfo GetLastErrorInfo() const override;
     bool SupportsFeature(MessageBusFeature feature) const override;
 
 private:

@@ -172,6 +172,10 @@ ConnectionState AmqpBusModule::GetConnectionState() const {
     return service_proxy_->GetConnectionState();
 }
 
+MessageBusErrorInfo AmqpBusModule::GetLastErrorInfo() const {
+    return service_proxy_->GetLastErrorInfo();
+}
+
 bool AmqpBusModule::SupportsFeature(MessageBusFeature feature) const {
     return service_proxy_->SupportsFeature(feature);
 }
